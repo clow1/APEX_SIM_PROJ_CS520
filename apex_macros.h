@@ -48,4 +48,10 @@
 /* Set this flag to 1 to enable cycle single-step mode */
 #define ENABLE_SINGLE_STEP 0
 
+
+/*VFU Macros will make it easier to see where certain instructions are going -J*/
+#define MUL_VFU 0
+#define INT_VFU 1
+#define BRANCH_VFU 2
+
 #endif

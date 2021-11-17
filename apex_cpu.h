@@ -43,6 +43,7 @@ typedef struct CPU_Stage
     int has_insn;
     int stage_delay; //Counter to delay MUL by four cycles -J
     int status_bit; //To help Decode1 check VFUs (1 for busy, 0 for available) -J
+    int vfu; //Just to lessen the amount of switch statements -J
 } CPU_Stage;
 
 
@@ -64,7 +65,7 @@ typedef struct Branch_Unit
 
 typedef struct IQ_Entry
 {
-  int status_bit;
+  int status_bit; //0 == available, 1 == taken -J
   int fu_type; // 0,1,2,3     0 = mult, 1 = int, 2 = branch, ETC;
                               //make a cool enUM
   int literal;
@@ -101,14 +102,14 @@ typedef struct ROB_Entry
 typedef struct Rename_Entry 
 {
     int id; //can del
-    int src_bit;
-    int phys_reg_idx;
+    int phys_reg_id;
 } Rename_Entry;
 
 typedef struct RF_Entry
 {
     int value;  //whatever supposed 2 be stored in the RF
     int cc; //2 bit extension;
+    int src_bit; //0 == invalid, 1 == valid -J
 
 } RF_Entry;
 
@@ -142,11 +143,12 @@ typedef struct APEX_CPU
     CPU_Stage branch_wb;
 
     Branch_Unit branch_predictor;
-    int rename_table[REG_FILE_SIZE+1];  /*last element in CC is the
+    Rename_Entry rename_table[REG_FILE_SIZE+1];  /*last element in CC is the
                                         most recently allocated phys. reg*/
 
   //earlier dispatch instruction = tie breaker
-    vector<IQ_Entry> iq; //8 entries; use a vector so we can remove out of order
+    IQ_Entry iq[8]; //8 entries
+                    //We don't need a vector bc PC value will be stored with each entry and we just flip status bit when used -J
                         //Can check business of FUs by has_insn
 
     queue<int> free_list; //nums 0-19 for the # reg
