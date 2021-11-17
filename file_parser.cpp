@@ -318,7 +318,7 @@ create_code_memory(const char *filename, int *size)
         return NULL;
     }
 
-    code_memory = calloc(code_memory_size, sizeof(APEX_Instruction));
+    code_memory = (APEX_Instruction *)calloc(code_memory_size, sizeof(APEX_Instruction));
     if (!code_memory)
     {
         fclose(fp);

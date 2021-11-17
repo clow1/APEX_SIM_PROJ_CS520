@@ -41,56 +41,9 @@ typedef struct CPU_Stage
     int result_buffer;
     int memory_address;
     int has_insn;
+    int stage_delay; //Counter to delay MUL by four cycles -J
+    int status_bit; //To help Decode1 check VFUs (1 for busy, 0 for available) -J
 } CPU_Stage;
-
-/* Model of APEX CPU */
-typedef struct APEX_CPU
-{
-    int pc;                        /* Current program counter */
-    int clock;                     /* Clock cycles elapsed */
-    int insn_completed;            /* Instructions retired */
-    int arch_regs[REG_FILE_SIZE];       /* Integer register file */
-    int phys_regs[20];
-    int code_memory_size;          /* Number of instruction in the input file */
-    APEX_Instruction *code_memory; /* Code Memory */
-    int data_memory[DATA_MEMORY_SIZE]; /* Data Memory */
-    int single_step;               /* Wait for user input after every cycle */
-    int zero_flag;                 /* {TRUE, FALSE} Used by BZ and BNZ to branch */
-    int fetch_from_next_cycle;
-
-    /* Pipeline stages */
-    CPU_Stage fetch;
-    CPU_Stage decode1;
-    CPU_Stage decode2;
-    CPU_Stage mult_exec;   //MULTIPLECATION UNIT
-    CPU_Stage int_exec;    //INTEGER FU UNIT
-    CPU_Stage branch_exec; //BRANCH UNIT EXECOOTION
-    CPU_Stage memory;
-
-    CPU_Stage mult_wb;
-    CPU_Stage int_wb;
-    CPU_Stage branch_wb;
-
-    Branch_Unit branch_predictor;
-    int rename_table[REG_FILE_SIZE+1];  /*last element in CC is the
-                                        most recently allocated phys. reg*/
-
-  //earlier dispatch instruction = tie breaker
-    vector<IQ_Entry> iq; //8 entries; use a vector so we can remove out of order
-
-    queue<int> free_list; //nums 0-19 for the # reg
-
-    queue<ROB_Entry> rob; /*check the size whenever
-                            we need to add to this queue
-                            maximum size 16 entries */
-
-    queue<IQ_Entry> lsq; /*LSQ entry has the same
-                          structure as an IQ entry.
-                          use queue because in order*/
-} APEX_CPU;
-
-/*functional unit struct*/
-
 
 
 /*branch predicution unit struct*/
@@ -158,6 +111,60 @@ typedef struct RF_Entry
     int cc; //2 bit extension;
 
 } RF_Entry;
+
+
+/* Model of APEX CPU */
+typedef struct APEX_CPU
+{
+    int pc;                        /* Current program counter */
+    int clock;                     /* Clock cycles elapsed */
+    int insn_completed;            /* Instructions retired */
+    int arch_regs[REG_FILE_SIZE];       /* Integer register file */
+    int phys_regs[20];
+    int code_memory_size;          /* Number of instruction in the input file */
+    APEX_Instruction *code_memory; /* Code Memory */
+    int data_memory[DATA_MEMORY_SIZE]; /* Data Memory */
+    int single_step;               /* Wait for user input after every cycle */
+    int zero_flag;                 /* {TRUE, FALSE} Used by BZ and BNZ to branch */
+    int fetch_from_next_cycle;
+
+    /* Pipeline stages */
+    CPU_Stage fetch;
+    CPU_Stage decode1;
+    CPU_Stage decode2;
+    CPU_Stage mult_exec;   //MULTIPLICATION UNIT
+    CPU_Stage int_exec;    //INTEGER UNIT
+    CPU_Stage branch_exec; //BRANCH UNIT EXECUTION
+    CPU_Stage memory;
+
+    CPU_Stage mult_wb;
+    CPU_Stage int_wb;
+    CPU_Stage branch_wb;
+
+    Branch_Unit branch_predictor;
+    int rename_table[REG_FILE_SIZE+1];  /*last element in CC is the
+                                        most recently allocated phys. reg*/
+
+  //earlier dispatch instruction = tie breaker
+    vector<IQ_Entry> iq; //8 entries; use a vector so we can remove out of order
+                        //Can check business of FUs by has_insn
+
+    queue<int> free_list; //nums 0-19 for the # reg
+
+    queue<ROB_Entry> rob; /*check the size whenever
+                            we need to add to this queue
+                            maximum size 16 entries */
+
+    queue<IQ_Entry> lsq; /*LSQ entry has the same
+                          structure as an IQ entry.
+                          use queue because in order*/
+} APEX_CPU;
+
+/*functional unit struct*/
+
+
+
+
 
 APEX_Instruction *create_code_memory(const char *filename, int *size);
 APEX_CPU *APEX_cpu_init(const char *filename);
