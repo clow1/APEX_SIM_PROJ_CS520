@@ -289,8 +289,11 @@ Stall if free list isn't empty
 
     if(available_ROB(cpu)){//All instructions need a slot in the ROB -J
         cpu->fetch.has_insn = FALSE; //Stall -J
-    }else{        
-        switch (cpu->decode1.opcode){//Some instructions don't need the free list
+        return;
+    }else{
+        char free_reg = -1; //If it stays -1, then we know that it's an instruction w/o a destination
+        char memory_op = FALSE;   
+        switch (cpu->decode1.opcode){//This switch is for determining if the instruction should be stalled
             case OPCODE_ADD:
             case OPCODE_ADDL:
             case OPCODE_SUB:
@@ -302,19 +305,85 @@ Stall if free list isn't empty
             case OPCODE_EXOR:
             case OPCODE_LOAD:
             case OPCODE_LDI:
-               if(cpu->free_list.empty()){
-                    cpu->fetch.has_insn = FALSE;
-                    break;
-                }else{
-                    int free_reg = cpu->free_list.front();
-                    cpu->free_list.pop();
+                if(cpu->decode1.opcode == OPCODE_LOAD || cpu->decode1.opcode == OPCODE_LDI){
+                    //LSQ check -J
+                    if(cpu->lsq.size() == 6){
+                        cpu->fetch.has_insn = FALSE;
+                        return;
+                    }else{
+                        memory_op = TRUE;
+                    }
                 }
-            default:
-                cpu->fetch.has_insn = TRUE; //Might have to change this, not sure how this might interact with branches/HALTs -J
-                int p1 = rename_table[cpu->decode1.rs1_value]; //Take arch reg and turn it to phys through lookup -J
-                int p2 = rename_table[cpu->decode1.rs2_value];
-
+               if(cpu->free_list.empty()){
+                    //Free List check -J
+                    cpu->fetch.has_insn = FALSE;
+                    return;
+                }else{
+                    free_reg = cpu->free_list.front();
+                    cpu->free_list.pop();
+                    break;
+                }
+            case OPCODE_STORE:
+            case OPCODE_STI:
+                //LSQ check -J
+                memory_op = TRUE;
+                if(cpu->decode1.opcode == OPCODE_LOAD || cpu->decode1.opcode == OPCODE_LDI){
+                    if(cpu->lsq.size() == 6){
+                        cpu->fetch.has_insn = FALSE;
+                        return;
+                    }
+                }
         }
+        //Do decode1 stuff, but check instruction types
+        cpu->fetch.has_insn = TRUE; //Might have to change this, not sure how this might interact with branches/HALTs -J
+        
+        switch(cpu->decode1.opcode){
+            //<dest> <- <src1> <op> <src2> -J
+            case OPCODE_ADD:
+            case OPCODE_ADDL:
+            case OPCODE_SUB:
+            case OPCODE_SUBL:
+            case OPCODE_MUL:
+            case OPCODE_AND:
+            case OPCODE_OR:
+            case OPCODE_EXOR:
+            case OPCODE_LOAD:
+                cpu->decode1.rs1 = rename_table[cpu->decode1.rs1]; //Take arch reg and turn it to phys through lookup -J
+                cpu->decode1.rs2 = rename_table[cpu->decode1.rs2];
+                cpu->rename_table[cpu->rd] = free_reg;
+                cpu->rd = free_reg;
+                break;
+            //<dest> <- <src1> -J
+            case OPCODE_MOVC:
+                cpu->decode1.rs1 = rename_table[cpu->decode1.rs1];
+                cpu->rename_table[cpu->rd] = free_reg;
+                cpu->rd = free_reg;
+                break;
+            //<dest> <- <src1> <op> #<literal> -J
+            case OPCODE_LOAD:
+            case OPCODE_LDI:
+                cpu->decode1.rs1 = rename_table[cpu->decode1.rs1];
+                cpu->rename_table[cpu->rd] = free_reg;
+                cpu->rd = free_reg;
+                break;
+            //<src1> <src2> #<literal> -J
+            case OPCODE_STORE:
+            case OPCODE_STI:
+                cpu->decode1.rs1 = rename_table[cpu->decode1.rs1];
+                cpu->decode1.rs2 = rename_table[cpu->decode1.rs2];
+                break;
+            //<branch> <src1> -J
+            case OPCODE_JUMP:
+                cpu->decode1.rs1 = rename_table[cpu->decode1.rs1];
+                break;
+            //<op> <src1> <src2> -J
+            case OPCODE_CMP: 
+                cpu->decode1.rs1 = rename_table[cpu->decode1.rs1];
+                cpu->decode1.rs2 = rename_table[cpu->decode1.rs2];
+                break;
+        }
+
+
 
 
    
@@ -1061,6 +1130,7 @@ APEX_cpu_init(const char *filename)
 
     /*Initialization Additions*/
     cpu->mult_exec.stage_delay = 1;
+
     for(i = 0; i < 20; i++){//Setting up free list
         cpu->free_list.push(i);
     }
@@ -1071,6 +1141,7 @@ APEX_cpu_init(const char *filename)
         iq_entry.src2_rdy_bit = 0;
         cpu->iq.push_back(iq_entry);
     }
+    //Don't need to init LSQ or ROB bc they are both proper queues -J
 
     return cpu;
 }

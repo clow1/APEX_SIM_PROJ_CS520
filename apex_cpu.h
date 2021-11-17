@@ -98,7 +98,7 @@ typedef struct ROB_Entry
     int itype;
 }ROB_Entry;
 
-typedef struct Rename_Entry
+typedef struct Rename_Entry 
 {
     int id; //can del
     int src_bit;
@@ -119,8 +119,8 @@ typedef struct APEX_CPU
     int pc;                        /* Current program counter */
     int clock;                     /* Clock cycles elapsed */
     int insn_completed;            /* Instructions retired */
-    int arch_regs[REG_FILE_SIZE];       /* Integer register file */
-    int phys_regs[20];
+    RF_Entry arch_regs[REG_FILE_SIZE];       /* Integer register file */
+    RF_Entry phys_regs[20];
     int code_memory_size;          /* Number of instruction in the input file */
     APEX_Instruction *code_memory; /* Code Memory */
     int data_memory[DATA_MEMORY_SIZE]; /* Data Memory */
