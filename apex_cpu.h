@@ -68,6 +68,7 @@ typedef struct IQ_Entry
   int status_bit; //0 == available, 1 == taken -J
   int fu_type; // 0,1,2,3     0 = mult, 1 = int, 2 = branch, ETC;
                               //make a cool enUM
+  int opcode;
   int literal;
   int src1_rdy_bit;
   int src1_tag;
@@ -80,6 +81,7 @@ typedef struct IQ_Entry
   int dest;
   int lsq_id;
 
+  int pc_value; //For tiebreaking -J
 }IQ_Entry;
 
 

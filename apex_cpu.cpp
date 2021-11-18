@@ -313,6 +313,14 @@ static char available_IQ(APEX_CPU* cpu){
     return FALSE;
 }
 
+static char index_IQ(APEX_CPU* cpu){//Finds the first valid index to write into -J
+    for(char i = 0; i < 8; i++){
+        if(iq[i].status_bit == 0){
+            return i;
+        }
+    }
+    return -1;
+}
 /*
  * Decode Stage of APEX Pipeline
  *
@@ -425,7 +433,7 @@ Rj <-- Rk <op> Rl
 */
    int free_reg = -1; //If it stays -1, then we know that it's an instruction w/o a destination
    int memory_op = FALSE;
-   switch(cpu->decode2.opcode){
+   switch(cpu->decode2.opcode){//Handling the instruction renaming -J
             //<dest> <- <src1> <op> <src2> -J
             case OPCODE_ADD:
             case OPCODE_ADDL:
@@ -435,14 +443,13 @@ Rj <-- Rk <op> Rl
             case OPCODE_AND:
             case OPCODE_OR:
             case OPCODE_EXOR:
-            case OPCODE_LOAD:
                 //Both sources must be valid before we can grab the data (Stall if not) -J
-                if(phys_regs[rename_table[cpu->decode2.rs1].phys_reg_id].src_bit == 0 || phys_regs[rename_table[cpu->decode2.rs2].phys_reg_id].src_bit== 0){
+                if(cpu->phys_regs[cpu->rename_table[cpu->decode2.rs1].phys_reg_id].src_bit == 0 || cpu->phys_regs[cpu->rename_table[cpu->decode2.rs2].phys_reg_id].src_bit== 0){
                     cpu->fetch.has_insn = FALSE;
                     return;
                 }
-                cpu->decode2.rs1 = rename_table[cpu->decode2.rs1].phys_reg_id; //Take arch reg and turn it to phys through lookup -J
-                cpu->decode2.rs2 = rename_table[cpu->decode2.rs2].phys_reg_id;
+                cpu->decode2.rs1 = cpu->rename_table[cpu->decode2.rs1].phys_reg_id; //Take arch reg and turn it to phys through lookup -J
+                cpu->decode2.rs2 = cpu->rename_table[cpu->decode2.rs2].phys_reg_id;
                 free_reg = cpu->free_list.front();
                 cpu->free_list.pop();
                 cpu->rename_table[cpu->rd].phys_reg_id = free_reg;
@@ -451,11 +458,11 @@ Rj <-- Rk <op> Rl
                 break;
             //<dest> <- <src1> -J
             case OPCODE_MOVC:
-                if(phys_regs[rename_table[cpu->decode2.rs1].phys_reg_id].src_bit == 0){
+                if(cpu->phys_regs[cpu->rename_table[cpu->decode2.rs1].phys_reg_id].src_bit == 0){
                     cpu->fetch.has_insn = FALSE;
                     return;
                 }
-                cpu->decode2.rs1 = rename_table[cpu->decode2.rs1].phys_reg_id;
+                cpu->decode2.rs1 = cpu->rename_table[cpu->decode2.rs1].phys_reg_id;
                 free_reg = cpu->free_list.front();
                 cpu->free_list.pop();
                 cpu->rename_table[cpu->rd].phys_reg_id = free_reg;
@@ -465,45 +472,72 @@ Rj <-- Rk <op> Rl
             //<dest> <- <src1> <op> #<literal> -J
             case OPCODE_LOAD:
             case OPCODE_LDI:
-                if(phys_regs[rename_table[cpu->decode2.rs1].phys_reg_id].src_bit == 0){
+                if(cpu->phys_regs[cpu->rename_table[cpu->decode2.rs1].phys_reg_id].src_bit == 0){
                     cpu->fetch.has_insn = FALSE;
                     return;
                 }
-                cpu->decode2.rs1 = rename_table[cpu->decode2.rs1].phys_reg_id;
+                cpu->decode2.rs1 = cpu->rename_table[cpu->decode2.rs1].phys_reg_id;
                 free_reg = cpu->free_list.front();
                 cpu->free_list.pop();                
                 cpu->rename_table[cpu->rd].phys_reg_id = free_reg;
-                cpu->rd = free_reg;
+                cpu->decode2.rd = free_reg;
                 cpu->phys_regs[cpu->rd].src_bit = 0;
                 break;
             //<src1> <src2> #<literal> -J
             case OPCODE_STORE:
             case OPCODE_STI:
-                if(phys_regs[rename_table[cpu->decode2.rs1].phys_reg_id].src_bit == 0 || phys_regs[rename_table[cpu->decode2.rs2].phys_reg_id].src_bit== 0){
+                if(cpu->phys_regs[cpu->rename_table[cpu->decode2.rs1].phys_reg_id].src_bit == 0 || cpu->phys_regs[cpu->rename_table[cpu->decode2.rs2].phys_reg_id].src_bit== 0){
                     cpu->fetch.has_insn = FALSE;
                     return;
                 }
-                cpu->decode2.rs1 = rename_table[cpu->decode2.rs1].phys_reg_id;
-                cpu->decode2.rs2 = rename_table[cpu->decode2.rs2].phys_reg_id;
+                cpu->decode2.rs1 = cpu->rename_table[cpu->decode2.rs1].phys_reg_id;
+                cpu->decode2.rs2 = cpu->rename_table[cpu->decode2.rs2].phys_reg_id;
                 break;
             //<branch> <src1> -J
             case OPCODE_JUMP:
-                if(phys_regs[rename_table[cpu->decode2.rs1].phys_reg_id].src_bit == 0){
+                if(cpu->phys_regs[cpu->rename_table[cpu->decode2.rs1].phys_reg_id].src_bit == 0){
                     cpu->fetch.has_insn = FALSE;
                     return;
                 }
-                cpu->decode2.rs1 = rename_table[cpu->decode2.rs1].phys_reg_id;
+                cpu->decode2.rs1 = cpu->rename_table[cpu->decode2.rs1].phys_reg_id;
                 break;
             //<op> <src1> <src2> -J
             case OPCODE_CMP:
-                if(phys_regs[rename_table[cpu->decode2.rs1].phys_reg_id].src_bit == 0 || phys_regs[rename_table[cpu->decode2.rs2].phys_reg_id].src_bit== 0){
+                if(cpu->phys_regs[cpu->rename_table[cpu->decode2.rs1].phys_reg_id].src_bit == 0 || cpu->phys_regs[cpu->rename_table[cpu->decode2.rs2].phys_reg_id].src_bit== 0){
                     cpu->fetch.has_insn = FALSE;
                     return;
                 } 
-                cpu->decode2.rs1 = rename_table[cpu->decode2.rs1].phys_reg_id;
-                cpu->decode2.rs2 = rename_table[cpu->decode2.rs2].phys_reg_id;
+                cpu->decode2.rs1 = cpu->rename_table[cpu->decode2.rs1].phys_reg_id;
+                cpu->decode2.rs2 = cpu->rename_table[cpu->decode2.rs2].phys_reg_id;
                 break;
         }
+    char entry_index = index_IQ(cpu);
+    //Filling out IQ entry -J
+    iq[entry_index].status_bit = 1;
+    iq[entry_index].fu_type = cpu->decode2.vfu;
+    iq[entry_index].opcode = cpu->decode2.opcode;
+    iq[entry_index].src1_rdy_bit = cpu->phys_regs[cpu->decode2->rs1].src_bit;
+    iq_entry[entry_index].src1_tag = cpu->decode2->rs1;
+    if(iq[entry_index].src1_rdy_bit){
+        iq[entry_index].src1_val = cpu->phys_regs[cpu->decode2->rs1];
+    }
+    iq[entry_index].src2_rdy_bit = cpu->phys_regs[cpu->decode2->rs2].src_bit;
+    iq_entry[entry_index].src2_tag = cpu->decode2->rs2;
+    if(iq[entry_index].src2_rdy_bit){
+        iq[entry_index].src2_val = cpu->phys_regs[cpu->decode2->rs2];
+    }
+    iq[entry_index].dest = cpu->decode2.rd;
+    iq[iq_entry].pc_value = cpu->decode2.pc;
+
+    switch (cpu->decode2.opcode){//Adding to LSQ if it's a MEM instr -J
+        case OPCODE_LOAD:
+        case OPCODE_LDI:
+        case OPCODE_STORE:
+        case OPCODE_STI:
+            iq[entry_index].lsq_id = lsq.size();
+            lsq.push(iq[entry_index]);
+            break;
+    }
 
 
 
