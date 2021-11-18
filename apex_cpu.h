@@ -12,7 +12,8 @@
 #include "apex_macros.h"
 #include <vector>
 #include <queue>
-
+#include <list>
+#include <climits>
 using namespace std;
 
 /* Format of an APEX instruction  */
@@ -40,6 +41,7 @@ typedef struct CPU_Stage
     int rs2_value;
     int result_buffer;
     int memory_address;
+    int inc_address_buffer; /*For LDI and STI instructions that need a way to carry the incremented src1 address over from EX stage -J*/
     int has_insn;
     int stage_delay; //Counter to delay MUL by four cycles -J
     int vfu; //Just to lessen the amount of switch statements -J
@@ -124,6 +126,7 @@ typedef struct APEX_CPU
     int data_memory[DATA_MEMORY_SIZE]; /* Data Memory */
     int single_step;               /* Wait for user input after every cycle */
     int zero_flag;                 /* {TRUE, FALSE} Used by BZ and BNZ to branch */
+    int positive_flag;
     int fetch_from_next_cycle;
 
     /* Pipeline stages */
@@ -150,13 +153,13 @@ typedef struct APEX_CPU
                     //We don't need a vector bc PC value will be stored with each entry and we just flip status bit when used -J
                         //Can check business of FUs by has_insn
 
-    queue<int> free_list; //nums 0-19 for the # reg
+    queue<int>* free_list; //nums 0-19 for the # reg
 
-    vector<ROB_Entry> rob; /*check the size whenever
+    list<ROB_Entry>* rob; /*check the size whenever
                             we need to add to this queue
                             maximum size 16 entries */
 
-    queue<IQ_Entry> lsq; /*LSQ entry has the same
+    queue<IQ_Entry>* lsq; /*LSQ entry has the same
                           structure as an IQ entry.
                           use queue because in order*/
 } APEX_CPU;

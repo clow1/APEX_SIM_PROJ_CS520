@@ -11,7 +11,7 @@ VERSION=2.0
 
 # Compile and Link flags, libraries
 CC=$(CROSS_PREFIX)g++
-CFLAGS= -g -Wall -O0 -DVERSION=$(VERSION)
+CFLAGS= -std=c++11 -g -Wall -O0 -DVERSION=$(VERSION)
 LDFLAGS=
 LIBS=
 
