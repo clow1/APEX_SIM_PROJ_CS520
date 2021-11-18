@@ -92,12 +92,9 @@ typedef struct ROB_Entry
     int pc_value;
     int ar_addr;
     int result;
-
-    int sval;
-    int sval_valid;
-
+    int opcode;
     int excodes;
-    int status_bit;
+    int status_bit; //0 for invalid, 1 for valid -J
     int itype;
 }ROB_Entry;
 
