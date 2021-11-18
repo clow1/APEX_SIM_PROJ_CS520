@@ -42,7 +42,6 @@ typedef struct CPU_Stage
     int memory_address;
     int has_insn;
     int stage_delay; //Counter to delay MUL by four cycles -J
-    int status_bit; //To help Decode1 check VFUs (1 for busy, 0 for available) -J
     int vfu; //Just to lessen the amount of switch statements -J
 } CPU_Stage;
 
@@ -70,7 +69,7 @@ typedef struct IQ_Entry
                               //make a cool enUM
   int opcode;
   int literal;
-  int src1_rdy_bit;
+  int src1_rdy_bit; //0 == not ready, 1 == ready -J 
   int src1_tag;
   int src1_val;
 
@@ -93,7 +92,6 @@ typedef struct ROB_Entry
     int ar_addr;
     int result;
     int opcode;
-    int excodes;
     int status_bit; //0 for invalid, 1 for valid -J
     int itype;
 }ROB_Entry;
