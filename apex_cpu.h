@@ -134,10 +134,12 @@ typedef struct APEX_CPU
     CPU_Stage int_exec;    //INTEGER UNIT
     CPU_Stage branch_exec; //BRANCH UNIT EXECUTION
     CPU_Stage memory;
+    CPU_Stage commitment; //Need a stage to settle accounts w/ IQ, LSQ, and ROB -J
 
     CPU_Stage mult_wb;
     CPU_Stage int_wb;
     CPU_Stage branch_wb;
+    CPU_Stage mem_wb; //LOAD, LDI, and STI share a single cycle WB stage -J 
 
     Branch_Unit branch_predictor;
     Rename_Entry rename_table[REG_FILE_SIZE+1];  /*last element in CC is the
@@ -150,7 +152,7 @@ typedef struct APEX_CPU
 
     queue<int> free_list; //nums 0-19 for the # reg
 
-    queue<ROB_Entry> rob; /*check the size whenever
+    vector<ROB_Entry> rob; /*check the size whenever
                             we need to add to this queue
                             maximum size 16 entries */
 

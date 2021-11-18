@@ -385,7 +385,7 @@ Stall if free list isn't empty
             case OPCODE_LDI:
                 if(cpu->decode1.opcode == OPCODE_LOAD || cpu->decode1.opcode == OPCODE_LDI){
                     //LSQ check -J
-                    if(cpu->lsq.size() == 6 || cpu->memory.has_insn){ //LOAD needs both INT_VFU and MEM Unit -J
+                    if(cpu->lsq.size() == 6){ //LOAD needs both INT_VFU and MEM Unit -J
                         cpu->fetch.has_insn = FALSE;
                         return;
                     }
@@ -402,7 +402,7 @@ Stall if free list isn't empty
             case OPCODE_STI:
                 //LSQ check -J
                 memory_op = TRUE;
-                if(cpu->lsq.size() == 6 || cpu->memory.has_insn){ 
+                if(cpu->lsq.size() == 6){ 
                     cpu->fetch.has_insn = FALSE;
                     return;
                 }
@@ -594,7 +594,11 @@ Rj <-- Rk <op> Rl
         case OPCODE_LDI:
         case OPCODE_STORE:
         case OPCODE_STI:
-            cpu->iq[entry_index].lsq_id = cpu->lsq.size();
+            if(cpu->lsq.empty()){
+                cpu->iq[entry_index].lsq_id = 0;
+            }else{
+                cpu->iq[entry_index].lsq_id = lsq.front().lsq_id + 1; //Give unique id to new entry -J
+            }
             cpu->lsq.push(cpu->iq[entry_index]);
             break;
     }
@@ -603,7 +607,50 @@ Rj <-- Rk <op> Rl
     //We don't forward data in pipeline to exec right away like before bc IQ is Out-of-Order -J
 }
 
+static int check_LSQ(APEX_CPU* cpu, int entry_index){
+    //Returns 100 if LSQ index cannot be used yet
+    switch (cpu->iq[entry_index]){
+        /*
+        Rules for LOAD
+        1) Entry for LOAD is at the head of LSQ
+        2) All fields are valid (checked prior to tiebreaker_IQ())
+        3) Memory is free
+        */
+        case OPCODE_LOAD:
+        case OPCODE_LDI:
+            if(!cpu->memory.has_insn && 
+                cpu->iq[entry_index].pc_value == cpu->lsq.front().pc_value){
+                return a;
+            }
+            break;
+        /*
+        Rules for STORE
+        1) All inputs are valid (checked prior to tiebreaker_IQ())
+        2) When STORE entry is at the head of the ROB and LSQ 
+        3) When memory is free
+        */
+        case OPCODE_STORE:
+        case OPCODE_STI:
+            if(!cpu->memory.has_insn && 
+                cpu->iq[entry_index].pc_value == cpu->lsq.front().pc_value &&
+                cpu->iq[entry_index].pc_value == cpu->rob.pc_value){
+                return a;
+            }
+            break; 
+    }
+
+    return 100;
+}
+
+
 static int tiebreaker_IQ(APEX_CPU* cpu, int a, int b){//The lower PC value is the earlier instruction (which in case of tie is issued first) -J
+    //If MEM operation, check the LSQ
+    if(a != 100 && cpu->iq[a].lsq_id != -1){
+        a = check_LSQ(cpu, a);
+    }
+    if(b != 100 && cpu->iq[b].lsq_id != -1){
+        b = check_LSQ(cpu, b);
+    }
     return (cpu->iq[a].pc_value < cpu->iq[b].pc_value) ? a : b;
 }
 
@@ -657,6 +704,10 @@ APEX_ISSUE_QUEUE(APEX_CPU *cpu){//Will handle grabbing the correct instructions 
         //We have a valid instruction to issue
         cpu->iq[entry_index].status_bit = 0;
         IQ_Entry issuing_instr = cpu->iq[entry_index];
+        if(cpu->iq[entry_index].lsq_id != -1){//If we grabbed an MEM op, make sure to adjust LSQ -J
+            cpu->lsq.pop();
+            cpu->iq[entry_index].lsq_id = -1;//Reset lsq_id field for later checks -J
+        }
         switch (cpu->iq[entry_index].fu_type){
             case MUL_VFU:
                 cpu->mul_exec.pc = issuing_instr.pc_value;
@@ -759,11 +810,11 @@ APEX_execute(APEX_CPU *cpu)
             switch (cpu->mult_exec->opcode){
                 case OPCODE_MUL:
                 {
-                        cpu->execute.result_buffer
-                            = cpu->execute.rs1_value * cpu->execute.rs2_value;
+                        cpu->mult_exec.result_buffer
+                            = cpu->mult_exec.rs1_value * cpu->mult_exec.rs2_value;
 
                         /* Set the zero flag based on the result buffer */
-                        if (cpu->execute.result_buffer == 0)
+                        if (cpu->mult_exec.result_buffer == 0)
                         {
                             cpu->zero_flag = TRUE;
                         } 
@@ -771,7 +822,7 @@ APEX_execute(APEX_CPU *cpu)
                         {
                             cpu->zero_flag = FALSE;
                         }
-                        if(cpu->execute.result_buffer > 0){
+                        if(cpu->mult_exec.result_buffer > 0){
                             cpu->positive_flag = TRUE;
                         }else{
                             cpu->positive_flag = FALSE;
@@ -794,11 +845,11 @@ APEX_execute(APEX_CPU *cpu)
         switch (cpu->mult_exec.opcode){
             case OPCODE_ADD:
             {
-                cpu->execute.result_buffer
-                    = cpu->execute.rs1_value + cpu->execute.rs2_value;
+                cpu->int_exec.result_buffer
+                    = cpu->int_exec.rs1_value + cpu->int_exec.rs2_value;
 
                 /* Set the zero flag based on the result buffer */
-                if (cpu->execute.result_buffer == 0)
+                if (cpu->int_exec.result_buffer == 0)
                 {
                     cpu->zero_flag = TRUE;
                 } 
@@ -806,7 +857,7 @@ APEX_execute(APEX_CPU *cpu)
                 {
                     cpu->zero_flag = FALSE;
                 }
-                if(cpu->execute.result_buffer > 0){
+                if(cpu->int_exec.result_buffer > 0){
                     cpu->positive_flag = TRUE;
                 }else{
                     cpu->positive_flag = FALSE;
@@ -815,11 +866,11 @@ APEX_execute(APEX_CPU *cpu)
             }
             case OPCODE_ADDL:
             {
-                cpu->execute.result_buffer
-                    = cpu->execute.rs1_value + cpu->execute.imm;
+                cpu->int_exec.result_buffer
+                    = cpu->int_exec.rs1_value + cpu->int_exec.imm;
 
                 /* Set the zero flag based on the result buffer */
-                if (cpu->execute.result_buffer == 0)
+                if (cpu->int_exec.result_buffer == 0)
                 {
                     cpu->zero_flag = TRUE;
                 } 
@@ -827,7 +878,7 @@ APEX_execute(APEX_CPU *cpu)
                 {
                     cpu->zero_flag = FALSE;
                 }
-                if(cpu->execute.result_buffer > 0){
+                if(cpu->int_exec.result_buffer > 0){
                     cpu->positive_flag = TRUE;
                 }else{
                     cpu->positive_flag = FALSE;
@@ -837,11 +888,11 @@ APEX_execute(APEX_CPU *cpu)
 
             case OPCODE_SUB:
             {
-                cpu->execute.result_buffer
-                    = cpu->execute.rs1_value - cpu->execute.rs2_value;
+                cpu->int_exec.result_buffer
+                    = cpu->int_exec.rs1_value - cpu->int_exec.rs2_value;
 
                 /* Set the zero flag based on the result buffer */
-                if (cpu->execute.result_buffer == 0)
+                if (cpu->int_exec.result_buffer == 0)
                 {
                     cpu->zero_flag = TRUE;
                 } 
@@ -849,7 +900,7 @@ APEX_execute(APEX_CPU *cpu)
                 {
                     cpu->zero_flag = FALSE;
                 }
-                if(cpu->execute.result_buffer > 0){
+                if(cpu->int_exec.result_buffer > 0){
                     cpu->positive_flag = TRUE;
                 }else{
                     cpu->positive_flag = FALSE;
@@ -859,11 +910,11 @@ APEX_execute(APEX_CPU *cpu)
 
             case OPCODE_SUBL:
             {
-                cpu->execute.result_buffer
-                    = cpu->execute.rs1_value - cpu->execute.imm;
+                cpu->int_exec.result_buffer
+                    = cpu->int_exec.rs1_value - cpu->int_exec.imm;
 
                 /* Set the zero flag based on the result buffer */
-                if (cpu->execute.result_buffer == 0)
+                if (cpu->int_exec.result_buffer == 0)
                 {
                     cpu->zero_flag = TRUE;
                 } 
@@ -871,7 +922,7 @@ APEX_execute(APEX_CPU *cpu)
                 {
                     cpu->zero_flag = FALSE;
                 }
-                if(cpu->execute.result_buffer > 0){
+                if(cpu->int_exec.result_buffer > 0){
                     cpu->positive_flag = TRUE;
                 }else{
                     cpu->positive_flag = FALSE;
@@ -881,11 +932,11 @@ APEX_execute(APEX_CPU *cpu)
 
             case OPCODE_AND:
             {
-                cpu->execute.result_buffer
-                    = cpu->execute.rs1_value & cpu->execute.rs2_value;
+                cpu->int_exec.result_buffer
+                    = cpu->int_exec.rs1_value & cpu->int_exec.rs2_value;
 
                 /* Set the zero flag based on the result buffer */
-                if (cpu->execute.result_buffer == 0)
+                if (cpu->int_exec.result_buffer == 0)
                 {
                     cpu->zero_flag = TRUE;
                 } 
@@ -893,7 +944,7 @@ APEX_execute(APEX_CPU *cpu)
                 {
                     cpu->zero_flag = FALSE;
                 }
-                if(cpu->execute.result_buffer > 0){
+                if(cpu->int_exec.result_buffer > 0){
                     cpu->positive_flag = TRUE;
                 }else{
                     cpu->positive_flag = FALSE;
@@ -903,11 +954,11 @@ APEX_execute(APEX_CPU *cpu)
 
             case OPCODE_OR:
             {
-                    cpu->execute.result_buffer
-                        = cpu->execute.rs1_value | cpu->execute.rs2_value;
+                    cpu->int_exec.result_buffer
+                        = cpu->int_exec.rs1_value | cpu->int_exec.rs2_value;
 
                     /* Set the zero flag based on the result buffer */
-                    if (cpu->execute.result_buffer == 0)
+                    if (cpu->int_exec.result_buffer == 0)
                     {
                         cpu->zero_flag = TRUE;
                     } 
@@ -915,7 +966,7 @@ APEX_execute(APEX_CPU *cpu)
                     {
                         cpu->zero_flag = FALSE;
                     }
-                    if(cpu->execute.result_buffer > 0){
+                    if(cpu->int_exec.result_buffer > 0){
                         cpu->positive_flag = TRUE;
                     }else{
                         cpu->positive_flag = FALSE;
@@ -925,11 +976,11 @@ APEX_execute(APEX_CPU *cpu)
 
             case OPCODE_EXOR:
             {
-                    cpu->execute.result_buffer
-                        = cpu->execute.rs1_value ^ cpu->execute.rs2_value;
+                    cpu->int_exec.result_buffer
+                        = cpu->int_exec.rs1_value ^ cpu->int_exec.rs2_value;
 
                     /* Set the zero flag based on the result buffer */
-                    if (cpu->execute.result_buffer == 0)
+                    if (cpu->int_exec.result_buffer == 0)
                     {
                         cpu->zero_flag = TRUE;
                     } 
@@ -937,7 +988,7 @@ APEX_execute(APEX_CPU *cpu)
                     {
                         cpu->zero_flag = FALSE;
                     }
-                    if(cpu->execute.result_buffer > 0){
+                    if(cpu->int_exec.result_buffer > 0){
                         cpu->positive_flag = TRUE;
                     }else{
                         cpu->positive_flag = FALSE;
@@ -946,10 +997,10 @@ APEX_execute(APEX_CPU *cpu)
             }
             case OPCODE_MOVC: 
             {
-                cpu->execute.result_buffer = cpu->execute.imm;
+                cpu->int_exec.result_buffer = cpu->int_exec.imm;
 
                 /* Set the zero flag based on the result buffer */
-                if (cpu->execute.result_buffer == 0)
+                if (cpu->int_exec.result_buffer == 0)
                 {
                     cpu->zero_flag = TRUE;
                 } 
@@ -957,7 +1008,7 @@ APEX_execute(APEX_CPU *cpu)
                 {
                     cpu->zero_flag = FALSE;
                 }
-                if(cpu->execute.result_buffer > 0){
+                if(cpu->int_exec.result_buffer > 0){
                     cpu->positive_flag = TRUE;
                 }else{
                     cpu->positive_flag = FALSE;
@@ -966,12 +1017,12 @@ APEX_execute(APEX_CPU *cpu)
             }
             case OPCODE_CMP:
             {
-                if(cpu->execute.rs1_value == cpu->execute.rs2_value){
+                if(cpu->int_exec.rs1_value == cpu->int_exec.rs2_value){
                     cpu->zero_flag = TRUE;
                 }else{
                     cpu->zero_flag = FALSE;
                 }
-                if(cpu->execute.rs1_value > cpu->execute.rs2_value){
+                if(cpu->int_exec.rs1_value > cpu->int_exec.rs2_value){
                     cpu->positive_flag = TRUE;
                 }else{
                     cpu->positive_flag = FALSE;
@@ -981,34 +1032,34 @@ APEX_execute(APEX_CPU *cpu)
             case OPCODE_LOAD:
             {
                 mem_instruction = TRUE;
-                cpu->execute.memory_address
-                    = cpu->execute.rs1_value + cpu->execute.imm;
+                cpu->int_exec.memory_address
+                    = cpu->int_exec.rs1_value + cpu->int_exec.imm;
                 break;
             }
 
             case OPCODE_STORE:
             {
                 mem_instruction = TRUE;
-                cpu->execute.memory_address
-                    = cpu->execute.rs2_value + cpu->execute.imm;
+                cpu->int_exec.memory_address
+                    = cpu->int_exec.rs2_value + cpu->int_exec.imm;
                 break;
             }
 
             case OPCODE_STI:
             {
                 mem_instruction = TRUE;
-                cpu->execute.memory_address
-                    = cpu->execute.rs1_value + cpu->execute.imm;
-                cpu->execute.inc_address_buffer = cpu->execute.rs1_value + 4;
+                cpu->int_exec.memory_address
+                    = cpu->int_exec.rs1_value + cpu->int_exec.imm;
+                cpu->int_exec.inc_address_buffer = cpu->int_exec.rs1_value + 4;
                 break;
             }
 
             case OPCODE_LDI:
             {
                 mem_instruction = TRUE;
-                cpu->execute.memory_address
-                    = cpu->execute.rs1_value + cpu->execute.imm;
-                cpu->execute.inc_address_buffer = cpu->execute.rs1_value + 4;
+                cpu->int_exec.memory_address
+                    = cpu->int_exec.rs1_value + cpu->int_exec.imm;
+                cpu->int_exec.inc_address_buffer = cpu->int_exec.rs1_value + 4;
                 break;
             }
         }
@@ -1024,12 +1075,13 @@ APEX_execute(APEX_CPU *cpu)
         Branch section
     */
     if(cpu->branch_exec.has_insn){
+        //Whoever does branch prediction will have to edit this portion significantly -J
         case OPCODE_BZ:
             {
                 if (cpu->zero_flag == TRUE)
                 {
                     /* Calculate new PC, and send it to fetch unit */
-                    cpu->pc = cpu->execute.pc + cpu->execute.imm;
+                    cpu->result_buffer = cpu->branch_exec.pc + cpu->branch_exec.imm;
                     
                     /* Since we are using reverse callbacks for pipeline stages, 
                      * this will prevent the new instruction from being fetched in the current cycle*/
@@ -1046,10 +1098,11 @@ APEX_execute(APEX_CPU *cpu)
 
             case OPCODE_BNZ:
             {
+
                 if (cpu->zero_flag == FALSE)
                 {
                     /* Calculate new PC, and send it to fetch unit */
-                    cpu->pc = cpu->execute.pc + cpu->execute.imm;
+                    cpu->result_buffer = cpu->branch_exec.pc + cpu->branch_exec.imm;
                     
                     /* Since we are using reverse callbacks for pipeline stages, 
                      * this will prevent the new instruction from being fetched in the current cycle*/
@@ -1069,7 +1122,7 @@ APEX_execute(APEX_CPU *cpu)
                 if (cpu->positive_flag == TRUE)
                 {
                     /* Calculate new PC, and send it to fetch unit */
-                    cpu->pc = cpu->execute.pc + cpu->execute.imm;
+                    cpu->result_buffer = cpu->branch_exec.pc + cpu->branch_exec.imm;
                     
                     /* Since we are using reverse callbacks for pipeline stages, 
                      * this will prevent the new instruction from being fetched in the current cycle*/
@@ -1089,7 +1142,7 @@ APEX_execute(APEX_CPU *cpu)
                 if (cpu->positive_flag == FALSE)
                 {
                     /* Calculate new PC, and send it to fetch unit */
-                    cpu->pc = cpu->execute.pc + cpu->execute.imm;
+                    cpu->result_buffer = cpu->branch_exec.pc + cpu->branch_exec.imm;
                     
                     /* Since we are using reverse callbacks for pipeline stages, 
                      * this will prevent the new instruction from being fetched in the current cycle*/
@@ -1107,7 +1160,7 @@ APEX_execute(APEX_CPU *cpu)
             case OPCODE_JUMP:
             {
                     /* Calculate new PC, and send it to fetch unit */
-                    cpu->pc = cpu->execute.rs1_value + cpu->execute.imm;
+                    cpu->result_buffer = cpu->branch_exec.rs1_value + cpu->branch_exec.imm;
                     
                     /* Since we are using reverse callbacks for pipeline stages, 
                      * this will prevent the new instruction from being fetched in the current cycle*/
@@ -1122,31 +1175,6 @@ APEX_execute(APEX_CPU *cpu)
         cpu->branch_wb = cpu->branch_exec;
         cpu->branch_exec.has_insn = FALSE;
     }
-
-
-    /*Have to remove this guy, but want to preserve the MEM stuff*/
-    /*if (cpu->execute.has_insn)
-    {
-        // Execute logic based on instruction type
-        switch (cpu->execute.opcode)
-        {
-            
-
-
-
-        }
-
-
-
-        // Copy data from execute latch to memory latch
-        cpu->memory = cpu->execute;
-        cpu->execute.has_insn = FALSE;
-
-        if (ENABLE_DEBUG_MESSAGES || display_state)
-        {
-            print_stage_content("Execute", &cpu->execute);
-        }
-    }*/
 }
 
 /*
@@ -1161,18 +1189,14 @@ APEX_memory(APEX_CPU *cpu)
     {
         switch (cpu->memory.opcode)
         {
-            case OPCODE_ADD:
-            {
-                /* No work for ADD */
-                break;
-            }
-
             case OPCODE_LDI:
             case OPCODE_LOAD:
             {
                 /* Read from data memory */
                 cpu->memory.result_buffer
                     = cpu->data_memory[cpu->memory.memory_address];
+                cpu->mem_wb = cpu->memory;
+                cpu->memory.has_insn = FALSE;
                 break;
             }
 
@@ -1180,6 +1204,8 @@ APEX_memory(APEX_CPU *cpu)
             {
                 /*Write data into memory*/
                 cpu->data_memory[cpu->memory.memory_address] = cpu->memory.rs1_value;
+                cpu->commitment = cpu->memory;
+                cpu->memory.has_insn = FALSE; //Last stop for a STORE, goes straight to commitment -J
                 break;
             }
 
@@ -1187,18 +1213,17 @@ APEX_memory(APEX_CPU *cpu)
             {
                 /*Write data into memory*/
                 cpu->data_memory[cpu->memory.memory_address] = cpu->memory.rs2_value;
+                cpu->mem_wb = cpu->memory;
+                cpu->memory.has_insn = FALSE;                
                 break;
             }
         }
 
-        /* Copy data from memory latch to writeback latch*/
-        cpu->writeback = cpu->memory;
-        cpu->memory.has_insn = FALSE;
-
+        /*
         if (ENABLE_DEBUG_MESSAGES || display_state)
         {
             print_stage_content("Memory", &cpu->memory);
-        }
+        }*/
     }
 }
 
@@ -1207,77 +1232,100 @@ APEX_memory(APEX_CPU *cpu)
  *
  * Note: You are free to edit this function according to your implementation
  */
+static void 
+APEX_forward(APEX_CPU* cpu, CPU_Stage forward){//This is where we'll forward the data to all relevant data structures -J
+    //Only forward instr that has a dest reg -J
+    switch(forward.opcode){
+        case OPCODE_ADD:
+        case OPCODE_LOAD:
+        case OPCODE_MOVC: 
+        case OPCODE_ADDL:
+        case OPCODE_SUB:
+        case OPCODE_SUBL:
+        case OPCODE_AND:
+        case OPCODE_OR:
+        case OPCODE_EXOR:
+        case OPCODE_MUL:
+            //Loop through iq and match rd to rs1 or rs2 and fill in and set ready bit -J
+            for(int i = 0; i < 8; i++){
+                if(cpu->iq[i].status_bit == 1){
+                    if(cpu->iq[i].src1_tag == forward.rd){
+                        cpu->iq[i].src1_val = forward.result_buffer; 
+                        cpu->iq[i].src1_rdy_bit = 1;
+                    }
+                    if(cpu->iq[i].src2_tag == forward.rd){
+                        cpu->iq[i].src2_val = forward.result_buffer; 
+                        cpu->iq[i].src2_rdy_bit = 1; 
+                    }
+
+                }
+            }
+            break;
+        //LDI has to forward 2 values, rd & src1 -J
+        case OPCODE_LDI:
+            for(int i = 0; i < 8; i++){
+                if(cpu->iq[i].status_bit == 1){
+                    if(cpu->iq[i].src1_tag == forward.rd){
+                        cpu->iq[i].src1_val = forward.result_buffer; 
+                        cpu->iq[i].src1_rdy_bit = 1;
+                    }
+                    if(cpu->iq[i].src2_tag == forward.rd){
+                        cpu->iq[i].src2_val = forward.result_buffer; 
+                        cpu->iq[i].src2_rdy_bit = 1; 
+                    }
+                    if(cpu->iq[i].src1_tag == forward.rs1){
+                        cpu->iq[i].src1_val = forward.inc_address_buffer; 
+                        cpu->iq[i].src1_rdy_bit = 1;
+                    }
+                    if(cpu->iq[i].src2_tag == forward.rs1){
+                        cpu->iq[i].src2_val = forward.inc_address_buffer; 
+                        cpu->iq[i].src2_rdy_bit = 1; 
+                    }
+
+                }
+            }
+        //STI only forwards src1 -J
+        case OPCODE_STI:
+            for(int i = 0; i < 8; i++){
+                if(cpu->iq[i].status_bit == 1){
+                    if(cpu->iq[i].src1_tag == forward.rs1){
+                        cpu->iq[i].src1_val = forward.inc_address_buffer; 
+                        cpu->iq[i].src1_rdy_bit = 1;
+                    }
+                    if(cpu->iq[i].src2_tag == forward.rs1){
+                        cpu->iq[i].src2_val = forward.inc_address_buffer; 
+                        cpu->iq[i].src2_rdy_bit = 1; 
+                    }
+
+                }
+            }
+            break;
+    }
+}
 static int
 APEX_writeback(APEX_CPU *cpu)
 {
 
-    /*
-        I think we want to handle ROB commits here
-    */
+    //Handling forwarding write backs -J
     if(cpu->mult_wb.has_insn){
-
+        APEX_forward(cpu->mult_wb);
+        mult_wb.has_insn = FALSE;
     }
     if(cpu->int_wb.has_insn){
-
+        APEX_forward(cpu->int_wb);
+        int_wb.has_insn = FALSE;
+    }
+    if(cpu->mem_wb.has_insn){
+        APEX_forward(cpu->branch_wb);
+        mem_wb.has_insn = FALSE;
     }
     if(cpu->branch_wb.has_insn){
-
-    }
-
-    if (cpu->writeback.has_insn)
-    {
-        /* Write result to register file based on instruction type */
-        switch (cpu->writeback.opcode)
-        {
-
-
-            case OPCODE_ADD:
-            case OPCODE_LOAD:
-            case OPCODE_MOVC: 
-            case OPCODE_ADDL:
-            case OPCODE_SUB:
-            case OPCODE_SUBL:
-            case OPCODE_AND:
-            case OPCODE_OR:
-            case OPCODE_EXOR:
-            case OPCODE_MUL:
-            {
-                cpu->regs[cpu->writeback.rd] = cpu->writeback.result_buffer;
-                cpu->available_regs[cpu->writeback.rd] -= 1; //Finished Writing to destination register so we unflag dependency
-                break;
-            }
-            
-            case OPCODE_LDI:
-            {
-                cpu->regs[cpu->writeback.rd] = cpu->writeback.result_buffer;
-                cpu->regs[cpu->writeback.rs1] = cpu->writeback.inc_address_buffer;
-                cpu->available_regs[cpu->writeback.rd] -= 1; //Finished Writing to destination register so we unflag dependency
-                cpu->available_regs[cpu->writeback.rs1] -= 1; //Finished Writing to destination register so we unflag dependency
-                break;
-
-            }
-            
-            case OPCODE_STI:
-            {
-                cpu->regs[cpu->writeback.rs1] = cpu->writeback.inc_address_buffer;
-                cpu->available_regs[cpu->writeback.rs1] -= 1; //Finished Writing to destination register so we unflag dependency
-                break;
-            }
-
-        }
-
-        cpu->insn_completed++;
-        cpu->writeback.has_insn = FALSE;
-
-        if (ENABLE_DEBUG_MESSAGES || display_state)
-        {
-            print_stage_content("Writeback", &cpu->writeback);
-        }
-
-        if (cpu->writeback.opcode == OPCODE_HALT)
-        {
-            /* Stop the APEX simulator */
+        //This will have to be modified when BTB is added -J
+        if(cpu->branch_wb.opcode == OPCODE_HALT){
             return TRUE;
+        }else{
+            APEX_forward(cpu->branch_wb);
+            branch_wb.has_insn = FALSE;            
         }
     }
 
@@ -1285,6 +1333,11 @@ APEX_writeback(APEX_CPU *cpu)
     return 0;
 }
 
+static void
+APEX_commitment(APEX_CPU* cpu){
+    cpu->insn_completed++;
+
+}
 /*
  * This function creates and initializes APEX cpu.
  *
@@ -1364,7 +1417,8 @@ APEX_cpu_init(const char *filename)
         iq_entry.status_bit = 0;
         iq_entry.src1_rdy_bit = 0;
         iq_entry.src2_rdy_bit = 0;
-        cpu->iq.push_back(iq_entry);
+        iq_entry.lsq_id = -1; //Lets us check later on if the IQ entry has corresponding LSQ entry (if -1, then it doesn't) -J
+        cpu->iq.[i] = iq_entry;
     }
     //Don't need to init LSQ or ROB bc they are both proper queues -J
 
@@ -1438,6 +1492,7 @@ APEX_cpu_run(APEX_CPU *cpu, const char * arg, int cycles_wanted)
             printf("APEX_CPU: Simulation Complete, cycles = %d instructions = %d\n", cpu->clock, cpu->insn_completed);
             break;
         }
+        APEX_commitment(cpu);
         APEX_memory(cpu);
         APEX_execute(cpu);
         APEX_decode2(cpu);
