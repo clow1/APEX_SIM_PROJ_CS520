@@ -45,6 +45,7 @@ typedef struct CPU_Stage
     int has_insn;
     int stage_delay; //Counter to delay MUL by four cycles -J
     int vfu; //Just to lessen the amount of switch statements -J
+    int stall; //Make it easier to explicitly stall instructions waiting for ROB/IQ/LSQ -J
 } CPU_Stage;
 
 
