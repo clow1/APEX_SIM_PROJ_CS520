@@ -42,6 +42,11 @@
 #define OPCODE_STI 0x13
 #define OPCODE_CMP 0x14
 #define OPCODE_JUMP 0X15
+
+/*other expanded instructions*/
+#define OPCODE_JALR 0x16
+#define OPCODE_RET 0x17
+
 /* Set this flag to 1 to enable debug messages */
 #define ENABLE_DEBUG_MESSAGES 1
 
