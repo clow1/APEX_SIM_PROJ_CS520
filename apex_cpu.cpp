@@ -122,7 +122,7 @@ static char available_ROB(APEX_CPU* cpu){
 
 static char available_IQ(APEX_CPU* cpu){
     for(int i = 0; i < 8; i++){
-        if(cpu->iq[i].status_bit == 0){
+        if(cpu->iq[i].status_bit == VALID){
             return TRUE;
         }
     }
@@ -131,7 +131,7 @@ static char available_IQ(APEX_CPU* cpu){
 
 static char index_IQ(APEX_CPU* cpu){//Finds the first valid index to write into -J
     for(char i = 0; i < 8; i++){
-        if(cpu->iq[i].status_bit == 0){
+        if(cpu->iq[i].status_bit == VALID){
             return i;
         }
     }
@@ -493,7 +493,7 @@ APEX_ISSUE_QUEUE(APEX_CPU *cpu){//Will handle grabbing the correct instructions 
 
     int entry_index = 100;
     for(int i = 0; i < 8; i++){
-        if(cpu->iq[i].status_bit == 1 && free_VFU(cpu, cpu->iq[i].fu_type)){//Now check and see if the src_bits are valid (but diff instr wait on diff srcs) -J
+        if(cpu->iq[i].status_bit == INVAILD && free_VFU(cpu, cpu->iq[i].fu_type)){//Now check and see if the src_bits are valid (but diff instr wait on diff srcs) -J
             switch(cpu->iq[i].opcode){
                 //First look at instr w/ src1 & src2
                 case OPCODE_ADD:
@@ -528,7 +528,7 @@ APEX_ISSUE_QUEUE(APEX_CPU *cpu){//Will handle grabbing the correct instructions 
                         }
                     }
                     break;
-                case OPCODE_RET: //Added this since it has only src1
+                case OPCODE_RET: //Added this since it has only src1 -C
                 //Look at instr with only literals
                 case OPCODE_MOVC:
                 case OPCODE_BP:
@@ -601,11 +601,6 @@ APEX_ISSUE_QUEUE(APEX_CPU *cpu){//Will handle grabbing the correct instructions 
                         cpu->int_exec.imm = issuing_instr.literal;
                         cpu->int_exec.rs1_value = issuing_instr.src1_val;
                         break;
-                    case OPCODE_JALR: //TODO -C
-                        cpu->int_exec.rs1 = issuing_instr.src1_tag;
-                        cpu->int_exec.rd = issuing_instr.dest;
-                        cpu->int_exec.imm = issuing_instr.literal;
-                        cpu->int_exec.rs1_value = issuing_instr.src1_val;
                     //src1 src2 literal -J
                     case OPCODE_STI:
                     case OPCODE_STORE:
@@ -638,12 +633,25 @@ APEX_ISSUE_QUEUE(APEX_CPU *cpu){//Will handle grabbing the correct instructions 
                     case OPCODE_BNZ:
                         cpu->branch_exec.imm = issuing_instr.literal;
                         break;
+                    //Only src1 -C
+                    case OPCODE_RET:
+                      cpu->branch_exec.rs1 = issuing_instr.src1_tag;
+                      cpu->branch_exec.rs1_value = issuing_instr.src1_val;
+                      break;
                     //src1 literal -J
                     case OPCODE_JUMP:
                         cpu->branch_exec.rs1 = issuing_instr.src1_tag;
                         cpu->branch_exec.imm = issuing_instr.literal;
                         cpu->branch_exec.rs1_value = issuing_instr.src1_val;
                         break;
+                    //JALR uses branch unit. -C
+                    case OPCODE_JALR:
+                        cpu->branch_exec.rs1 = issuing_instr.src1_tag;
+                        cpu->branch_exec.rd = issuing_instr.dest;
+                        cpu->branch_exec.imm = issuing_instr.literal;
+                        cpu->branch_exec.rs1_value = issuing_instr.src1_val;
+                        break;
+
                 }
                 break;
         }
@@ -986,6 +994,14 @@ APEX_execute(APEX_CPU *cpu)
                         /* Calculate new PC, and send it to result buffer */
                         cpu->branch_exec.result_buffer = cpu->branch_exec.rs1_value + cpu->branch_exec.imm;
 
+                }
+
+                case OPCODE_JALR:
+                {
+                    /*Calculate address by adding src1 and immediate and saves the return
+                    address (next instr under jalr) at the same time */
+                      cpu->branch_exec.result_buffer = cpu->branch_exec.rs1_value + cpu->branch_exec.imm;
+                      cpu->branch_exec.rd_value = cpu->branch_exec.memory_address + 4; //add 4 to obtain the NEXT INSTRUCTION ADDRESS -C
                 }
         }
 

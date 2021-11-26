@@ -69,10 +69,10 @@ typedef struct IQ_Entry
 {
   int status_bit; //0 == available, 1 == taken -J
   int fu_type; // 0,1,2,3     0 = mult, 1 = int, 2 = branch, ETC;
-                              //make a cool enUM
+
   int opcode;
   int literal;
-  int src1_rdy_bit; //0 == not ready, 1 == ready -J 
+  int src1_rdy_bit; //0 == not ready, 1 == ready -J ----> I added some enums for rdy and status to make it easier to follow -C
   int src1_tag;
   int src1_val;
 
@@ -99,7 +99,7 @@ typedef struct ROB_Entry
     int itype;
 }ROB_Entry;
 
-typedef struct Rename_Entry 
+typedef struct Rename_Entry
 {
     int id; //can del
     int phys_reg_id;
@@ -143,7 +143,7 @@ typedef struct APEX_CPU
     CPU_Stage mult_wb;
     CPU_Stage int_wb;
     CPU_Stage branch_wb;
-    CPU_Stage mem_wb; //LOAD, LDI, and STI share a single cycle WB stage -J 
+    CPU_Stage mem_wb; //LOAD, LDI, and STI share a single cycle WB stage -J
 
     Branch_Unit branch_predictor;
     Rename_Entry rename_table[REG_FILE_SIZE+1];  /*last element in CC is the

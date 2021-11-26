@@ -60,4 +60,13 @@
 #define BRANCH_VFU 2
 
 #define CC_INDEX 16
+
+/*Clear cut macros of any field that represents src or status bit in IQ or ROB entries -C*/
+#define VALID 0
+#define INVALID 1
+
+/*Clear cut macros of the rdy bit -C */
+#define NOT_READY 0
+#define READY 1
+
 #endif
