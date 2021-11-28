@@ -1,0 +1,27 @@
+LDI  is the only instruction that requires 2 registers and a free list. J did not do this in the implementation
+So there needs to be a special object for LDI to grab 2 items off the free list.
+
+Because LDI stores the whatever you grab from the load into the destination and then also stores the address + 4 into one of the source registers.
+So it'll need 2 levels of register renaming.
+
+DELAYS and how that affects psuedo race conditions
+  Like a multiply (the fact that it's out of order and separate physical registers)
+  make some instruction set that a mult and an add come out at the same time
+  add some noops for delays because multiply sticks in there for 4 cycles.
+
+  tldr: one instruction w delay and 1 without delay tries to read or write
+
+  Test the normal arithmetic stuff.
+
+    Then flood the IQ with a bunch of garbage instructions. See if it works with a lot of instructions. Use NOPS.
+              It will most likely work and delay properly.
+
+    HALT only halts the program when it's confirmed and committed. So once it's the last instruction/at the head (last instruction)
+    then the program actually halts.
+            HALT end of committal of the ROB
+            MAKE SURE TO CHECK THIS. Check the specs as well.
+
+
+Definitely doesn't work if you write the wrong register into an add.
+
+MOVC into R0 and R1. Then you want to add R5 and R6: this will cause the code will explode. 
