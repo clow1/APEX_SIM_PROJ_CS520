@@ -1001,7 +1001,7 @@ APEX_execute(APEX_CPU *cpu)
                     /*Calculate address by adding src1 and immediate and saves the return
                     address (next instr under jalr) at the same time */
                       cpu->branch_exec.result_buffer = cpu->branch_exec.rs1_value + cpu->branch_exec.imm;
-                      cpu->branch_exec.rd_value = cpu->branch_exec.memory_address + 4; //add 4 to obtain the NEXT INSTRUCTION ADDRESS -C
+                      cpu->branch_exec.inc_address_buffer = cpu->branch_exec.memory_address + 4; //add 4 to obtain the NEXT INSTRUCTION ADDRESS -C
                 }
         }
 
