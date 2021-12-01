@@ -186,8 +186,9 @@ Stall if free list isn't empty
                         }
                         memory_op = TRUE;
                     }
-                    // VFU availability check -C 
-                    if (!(free_VFU(cpu, cpu->decode1.vfu)))
+                    // VFU availability check -C
+                  //  if (cpu->int_exec.vfu == 1)
+                    if (cpu->decode1.vfu == 1)
                     {
                       cpu->fetch.stall = TRUE;
                       return;
@@ -209,29 +210,42 @@ Stall if free list isn't empty
                         cpu->fetch.stall = TRUE;
                         return;
                     }
+                  }
 
-
-
-          /**Begin checking for VFU for instructions <rd> <rs1> <imm> -C **/
-                switch(cpu->decode1.opcode)
-                {
-                    case OPCODE_ADD:
-                    case OPCODE_ADDL:
-                    case OPCODE_SUB:
-                    case OPCODE_SUBL:
-                    case OPCODE_MUL:
-                    case OPCODE_AND:
-                    case OPCODE_OR:
-                    case OPCODE_EXOR:
-                    case OPCODE_LDI:
-                    {
-                    }
-
-                }
-            }
 
 
             //Do decode1 stuff, but check instruction types
+
+
+              /**DECODE STUFF FOR INTR TYPE   <rd> <rs1> <imm> -C **/
+                switch(cpu->decode1.opcode)
+                {
+                      case OPCODE_ADD:
+                      case OPCODE_ADDL:
+                      case OPCODE_SUB:
+                      case OPCODE_SUBL:
+                      case OPCODE_MUL:
+                      case OPCODE_AND:
+                      case OPCODE_OR:
+                      case OPCODE_EXOR:
+                      case OPCODE_LDI:
+                      {
+                        if (cpu->phys_regs[cpu->decode1.rs1].src_bit == INVALID
+                            || cpu->phys_regs[cpu->decode1.rd].src_bit == INVALID)
+                            {
+                              //Need to somehow check and see if these registers are available. Maybe using freelist.
+
+
+                          }
+
+                        }
+                    cpu->phys_regs[cpu->decode1.rs1] =
+                      cpu->arch_regs[cpu->decode1.rs1];
+
+                    cpu->phys_regs[cpu->decode1.rd] =
+                      cpu->arch_regs[cpu->decode1.rd];
+                    }
+
 
 
 
@@ -298,7 +312,7 @@ Rj <-- Rk <op> Rl
                     cpu->decode2.rd = free_reg;
                     cpu->phys_regs[cpu->decode2.rd].src_bit = 0;
 
-                    //For LDI, we need to handle both registers since we grabbed 2 free registers for rd and and then rs1+4. -C
+                    //For LDI, we need to handle both registers: 2 free registers for rd and rs1. -C
 
 
                     break;
