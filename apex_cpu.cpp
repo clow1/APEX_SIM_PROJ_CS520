@@ -211,13 +211,12 @@ Stall if free list isn't empty
                         return;
                     }
                   }
-
+                }
 
 
             //Do decode1 stuff, but check instruction types
 
-
-              /**DECODE STUFF FOR INTR TYPE   <rd> <rs1> <imm> -C **/
+              /**DECODE STUFF FOR INSTR TYPE   <rd> <rs1> <imm> -C **/
                 switch(cpu->decode1.opcode)
                 {
                       case OPCODE_ADD:
@@ -228,23 +227,40 @@ Stall if free list isn't empty
                       case OPCODE_AND:
                       case OPCODE_OR:
                       case OPCODE_EXOR:
+                      case OPCODE_MOVC:
+                      case OPCODE_STORE:
+                      case OPCODE_STI:
+                      case OPCODE_JUMP:
+                      case OPCODE_CMP:
+                      case OPCODE_JALR:
+                      case OPCODE_LOAD:
                       case OPCODE_LDI:
                       {
                         if (cpu->phys_regs[cpu->decode1.rs1].src_bit == INVALID
                             || cpu->phys_regs[cpu->decode1.rd].src_bit == INVALID)
-                            {
-                              //Need to somehow check and see if these registers are available. Maybe using freelist.
-
-
-                          }
-
+                        {
+                              //Need to somehow check and see if these registers are available. Maybe using freelist. -C
+                              cpu->decode1.stall = TRUE;
+                              return;
                         }
-                    cpu->phys_regs[cpu->decode1.rs1] =
-                      cpu->arch_regs[cpu->decode1.rs1];
+                        else
+                        {
+                          //LDI is the only instruction that also needs to save the rd reg -C
+                          cpu->phys_regs[cpu->decode1.rd] =
+                            cpu->arch_regs[cpu->decode1.rd];
 
-                    cpu->phys_regs[cpu->decode1.rd] =
-                      cpu->arch_regs[cpu->decode1.rd];
+                          break;
+                        }
+
+                      }
+                    //this is for the rest of these types of instructions -C
+                    if (cpu->phys_regs[cpu->decode1.rs1].src_bit == INVALID)
+                    {
+                      cpu->phys_regs[cpu->decode1.rs1] =
+                      cpu->arch_regs[cpu->decode1.rs1];
                     }
+
+                  }
 
 
 
@@ -256,7 +272,8 @@ Stall if free list isn't empty
             cpu->decode1.has_insn = FALSE;
             cpu->fetch.stall = FALSE;
         }
-    }
+
+
 
 }
 
