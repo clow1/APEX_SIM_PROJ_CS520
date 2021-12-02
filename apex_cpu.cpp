@@ -186,15 +186,6 @@ Stall if free list isn't empty
                         }
                         memory_op = TRUE;
                     }
-                    // VFU availability check -C
-                  //  if (cpu->int_exec.vfu == 1)
-                    if (cpu->decode1.vfu == 1)
-                    {
-                      cpu->fetch.stall = TRUE;
-                      return;
-                    }
-
-
                    if(cpu->free_list->empty()){
                         //Free List check -J
                         cpu->fetch.stall = TRUE;
@@ -210,61 +201,8 @@ Stall if free list isn't empty
                         cpu->fetch.stall = TRUE;
                         return;
                     }
-                  }
-                }
-
-
+            }
             //Do decode1 stuff, but check instruction types
-
-              /**DECODE STUFF FOR INSTR TYPE   <rd> <rs1> <imm> -C **/
-                switch(cpu->decode1.opcode)
-                {
-                      case OPCODE_ADD:
-                      case OPCODE_ADDL:
-                      case OPCODE_SUB:
-                      case OPCODE_SUBL:
-                      case OPCODE_MUL:
-                      case OPCODE_AND:
-                      case OPCODE_OR:
-                      case OPCODE_EXOR:
-                      case OPCODE_MOVC:
-                      case OPCODE_STORE:
-                      case OPCODE_STI:
-                      case OPCODE_JUMP:
-                      case OPCODE_CMP:
-                      case OPCODE_JALR:
-                      case OPCODE_LOAD:
-                      case OPCODE_LDI:
-                      {
-                        if (cpu->phys_regs[cpu->decode1.rs1].src_bit == INVALID
-                            || cpu->phys_regs[cpu->decode1.rd].src_bit == INVALID)
-                        {
-                              //Need to somehow check and see if these registers are available. Maybe using freelist. -C
-                              cpu->decode1.stall = TRUE;
-                              return;
-                        }
-                        else
-                        {
-                          //LDI is the only instruction that also needs to save the rd reg -C
-                          cpu->phys_regs[cpu->decode1.rd] =
-                            cpu->arch_regs[cpu->decode1.rd];
-
-                          break;
-                        }
-
-                      }
-                    //this is for the rest of these types of instructions -C
-                    if (cpu->phys_regs[cpu->decode1.rs1].src_bit == INVALID)
-                    {
-                      cpu->phys_regs[cpu->decode1.rs1] =
-                      cpu->arch_regs[cpu->decode1.rs1];
-                    }
-
-                  }
-
-
-
-
             //cpu->fetch.has_insn = TRUE; //Might have to change this, not sure how this might interact with branches/HALTs -J
 
 
@@ -272,8 +210,7 @@ Stall if free list isn't empty
             cpu->decode1.has_insn = FALSE;
             cpu->fetch.stall = FALSE;
         }
-
-
+    }
 
 }
 
@@ -291,7 +228,7 @@ Rj <-- Rk <op> Rl
 */
     if(cpu->decode2.has_insn){
        int free_reg = -1; //If it stays -1, then we know that it's an instruction w/o a destination
-       //we need to also save a register for the incremented address of rs1.
+
        switch(cpu->decode2.opcode){//Handling the instruction renaming -J
                 //<dest> <- <src1> <op> <src2> -J
                 case OPCODE_ADD:
@@ -328,10 +265,6 @@ Rj <-- Rk <op> Rl
                     cpu->rename_table[cpu->decode2.rd].phys_reg_id = free_reg;
                     cpu->decode2.rd = free_reg;
                     cpu->phys_regs[cpu->decode2.rd].src_bit = 0;
-
-                    //For LDI, we need to handle both registers: 2 free registers for rd and rs1. -C
-
-
                     break;
                 //<src1> <src2> #<literal> -J
                 case OPCODE_STORE:
