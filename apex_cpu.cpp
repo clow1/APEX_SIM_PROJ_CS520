@@ -83,6 +83,7 @@ APEX_fetch(APEX_CPU *cpu)
             case OPCODE_BP:
             case OPCODE_BNP:
             case OPCODE_JUMP:
+            case OPCODE_JALR:
             case OPCODE_HALT:
                 cpu->fetch.vfu = BRANCH_VFU;
                 break;
@@ -232,9 +233,7 @@ Rj <-- Rk <op> Rl
        switch(cpu->decode2.opcode){//Handling the instruction renaming -J
                 //<dest> <- <src1> <op> <src2> -J
                 case OPCODE_ADD:
-                case OPCODE_ADDL:
                 case OPCODE_SUB:
-                case OPCODE_SUBL:
                 case OPCODE_MUL:
                 case OPCODE_AND:
                 case OPCODE_OR:
@@ -257,6 +256,8 @@ Rj <-- Rk <op> Rl
                     cpu->phys_regs[cpu->decode2.rd].src_bit = 0;
                     break;
                 //<dest> <- <src1> <op> #<literal> -J
+                case OPCODE_ADDL:
+                case OPCODE_SUBL:
                 case OPCODE_LOAD:
                 case OPCODE_LDI:
                     cpu->decode2.rs1 = cpu->rename_table[cpu->decode2.rs1].phys_reg_id;
@@ -309,7 +310,7 @@ Rj <-- Rk <op> Rl
             case OPCODE_BZ:
             case OPCODE_BNZ:
                 cpu->iq[entry_index].literal = cpu->decode2.imm;
-             //TODO: Jump and link -C
+
 
 
         }
@@ -328,8 +329,8 @@ Rj <-- Rk <op> Rl
             case OPCODE_STORE:
             case OPCODE_STI:
             case OPCODE_JUMP:
-            case OPCODE_JALR: //TODO -C
-            case OPCODE_RET: //TODO -C
+            case OPCODE_JALR:
+            case OPCODE_RET:
             case OPCODE_CMP:
                 cpu->iq[entry_index].src1_rdy_bit = cpu->phys_regs[cpu->decode2.rs1].src_bit;
                 cpu->iq[entry_index].src1_tag = cpu->decode2.rs1;
@@ -368,7 +369,7 @@ Rj <-- Rk <op> Rl
             case OPCODE_OR:
             case OPCODE_EXOR:
             case OPCODE_MOVC:
-            case OPCODE_JALR: //TODO -C
+            case OPCODE_JALR:
             case OPCODE_LOAD:
             case OPCODE_LDI:
                 cpu->iq[entry_index].dest = cpu->decode2.rd;
@@ -381,6 +382,7 @@ Rj <-- Rk <op> Rl
         switch (cpu->decode2.opcode){//Adding to LSQ if it's a MEM instr -J
             case OPCODE_LOAD:
             case OPCODE_LDI:
+            case OPCODE_RET:
             case OPCODE_STORE:
             case OPCODE_STI:
                 if(cpu->lsq->empty()){
@@ -391,7 +393,6 @@ Rj <-- Rk <op> Rl
                 cpu->lsq->push(cpu->iq[entry_index]);
                 break;
 
-        //  case RET: //Not sure if we need this here yet -- I'm putting this here because this instruction DOES require memory access to an address described in rs1 -C
 
         }
 
