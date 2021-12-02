@@ -298,6 +298,8 @@ Rj <-- Rk <op> Rl
         cpu->iq[entry_index].fu_type = cpu->decode2.vfu;
         cpu->iq[entry_index].opcode = cpu->decode2.opcode;
         switch(cpu->decode2.opcode){//Instructions w/ literals -J
+            case OPCODE_ADDL:
+            case OPCODE_SUBL:
             case OPCODE_LOAD:
             case OPCODE_LDI:
             case OPCODE_STORE:
@@ -531,6 +533,7 @@ APEX_ISSUE_QUEUE(APEX_CPU *cpu){//Will handle grabbing the correct instructions 
                     break;
                 case OPCODE_RET: //Added this since it has only src1 -C
                 //Look at instr with only literals
+
                 case OPCODE_MOVC:
                 case OPCODE_BP:
                 case OPCODE_BNP:
@@ -541,6 +544,7 @@ APEX_ISSUE_QUEUE(APEX_CPU *cpu){//Will handle grabbing the correct instructions 
                     if(entry_index == 100){
                         entry_index = i;
                     }else{
+
                         entry_index = tiebreaker_IQ(cpu, entry_index, i);
                     }
                     break;
@@ -582,9 +586,9 @@ APEX_ISSUE_QUEUE(APEX_CPU *cpu){//Will handle grabbing the correct instructions 
                 switch(issuing_instr.opcode){//Break down INT ops based on instruction syntax -J
                     //dest src1 src2 -J
                     case OPCODE_ADD:
-                    case OPCODE_ADDL:
+                  //  case OPCODE_ADDL:
                     case OPCODE_SUB:
-                    case OPCODE_SUBL:
+                  //  case OPCODE_SUBL:
                     case OPCODE_AND:
                     case OPCODE_OR:
                     case OPCODE_EXOR:
@@ -595,6 +599,8 @@ APEX_ISSUE_QUEUE(APEX_CPU *cpu){//Will handle grabbing the correct instructions 
                         cpu->int_exec.rs2_value = issuing_instr.src2_val;
                         break;
                     //dest src1 literal -J
+                    case OPCODE_ADDL:
+                    case OPCODE_SUBL:
                     case OPCODE_LOAD:
                     case OPCODE_LDI:
                         cpu->int_exec.rs1 = issuing_instr.src1_tag;
