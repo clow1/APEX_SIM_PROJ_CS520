@@ -6,7 +6,8 @@
  * Copyright (c) 2020, Gaurav Kothari (gkothar1@binghamton.edu)
  * State University of New York at Binghamton
  */
-#include <stdio.h>
+
+#include<iostream>
 #include <stdlib.h>
 #include <string.h>
 
@@ -260,12 +261,19 @@ Rj <-- Rk <op> Rl
                 case OPCODE_SUBL:
                 case OPCODE_LOAD:
                 case OPCODE_LDI:
+                  /*  cpu->decode2.rs1 = cpu->rename_table[cpu->decode2.rs1].phys_reg_id;
+                    free_reg = cpu->free_list->front();
+                    cpu->free_list->pop();
+                    cpu->rename_table[cpu->decode2.rd].phys_reg_id = free_reg;
+                    cpu->decode2.rd = free_reg;
+                    cpu->phys_regs[cpu->decode2.rd].src_bit = 0;*/
                     cpu->decode2.rs1 = cpu->rename_table[cpu->decode2.rs1].phys_reg_id;
                     free_reg = cpu->free_list->front();
                     cpu->free_list->pop();
                     cpu->rename_table[cpu->decode2.rd].phys_reg_id = free_reg;
                     cpu->decode2.rd = free_reg;
                     cpu->phys_regs[cpu->decode2.rd].src_bit = 0;
+
                     break;
                 //<src1> <src2> #<literal> -J
                 case OPCODE_STORE:
@@ -313,6 +321,13 @@ Rj <-- Rk <op> Rl
             case OPCODE_BNZ:
                 cpu->iq[entry_index].literal = cpu->decode2.imm;
 
+                std::cout<< "***Line 323***"<<std::endl;
+                std::cout<< "IQEntry:  " << cpu->decode2.opcode << " " << std::endl;
+                std::cout<< "Literal: " << cpu->iq[entry_index].literal << std::endl;
+
+                std::cout<<"--------------------------------" << std::endl;
+
+
 
 
         }
@@ -339,6 +354,13 @@ Rj <-- Rk <op> Rl
                 if(cpu->iq[entry_index].src1_rdy_bit){
                     cpu->iq[entry_index].src1_val = cpu->phys_regs[cpu->decode2.rs1].value;
                 }
+                std::cout<< "***Line 357***"<<std::endl;
+                std::cout<< "IQEntry:  " << cpu->decode2.opcode << " " << std::endl;
+                std::cout<< "R1 TAG:   " << cpu->iq[entry_index].src1_tag
+                <<" || R1 VAL: " << cpu->iq[entry_index].src1_val << " || "  << "R1 RDY: " <<  cpu->iq[entry_index].src1_val << std::endl;
+                std::cout<<"================" << std::endl;
+
+
                 break;
 
         }
@@ -374,7 +396,12 @@ Rj <-- Rk <op> Rl
             case OPCODE_JALR:
             case OPCODE_LOAD:
             case OPCODE_LDI:
+
                 cpu->iq[entry_index].dest = cpu->decode2.rd;
+                std::cout<<"Line 385" <<std::endl;
+                std::cout << "op #:  " << cpu->decode2.opcode << std::endl;
+                std::cout<<"rd: " <<cpu->decode2.rd << std::endl;
+                std::cout<<"====================" << std::endl;
                 break;
 
 
@@ -391,8 +418,15 @@ Rj <-- Rk <op> Rl
                     cpu->iq[entry_index].lsq_id = 0;
                 }else{
                     cpu->iq[entry_index].lsq_id = cpu->lsq->front().lsq_id + 1; //Give unique id to new entry -J
+
                 }
                 cpu->lsq->push(cpu->iq[entry_index]);
+
+                std::cout<<"Line 422" <<std::endl;
+                std::cout<<"OP #: " << cpu->decode2.opcode << std::endl;
+                std::cout<< "cpu->iq[entry_index].src1_val :  " << cpu->iq[entry_index].src1_val << std::endl;
+
+
                 break;
 
 
