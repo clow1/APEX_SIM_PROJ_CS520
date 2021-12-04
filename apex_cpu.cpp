@@ -97,7 +97,7 @@ print_memory(const APEX_CPU *cpu)
         printf("| MEM[%d]  \t| Data Value = %d \t|\n", i, cpu->data_memory[i] );
     }
     printf("\n");
-    
+
 }
 
 /*
@@ -240,7 +240,7 @@ Stall if free list isn't empty
         } else{
 
             switch (cpu->decode1.opcode){//This switch is for checking LSQ & Free List -J
-                // Operations with a destination register need to be able to allocate a new physical register 
+                // Operations with a destination register need to be able to allocate a new physical register
                 case OPCODE_ADD:
                 case OPCODE_ADDL:
                 case OPCODE_SUB:
@@ -256,7 +256,7 @@ Stall if free list isn't empty
                     }
                     break;
 
-                // Memory operations w/ destination regsiter 
+                // Memory operations w/ destination regsiter
                 case OPCODE_LOAD:
 
                     //LSQ / Free List check  -J
@@ -282,7 +282,7 @@ Stall if free list isn't empty
                 cpu->decode2 = cpu->decode1;
                 cpu->decode1.has_insn = FALSE;
                 cpu->fetch.stall = FALSE;
-            }    
+            }
         }
 
         if (ENABLE_DEBUG_MESSAGES) {
@@ -590,7 +590,7 @@ APEX_ISSUE_QUEUE(APEX_CPU *cpu){//Will handle grabbing the correct instructions 
                     break;
 
                 //Look at instr with only src1 -H
-                case OPCODE_ADDL: 
+                case OPCODE_ADDL:
                 case OPCODE_SUBL:
                 case OPCODE_LOAD:
                 case OPCODE_JUMP:
@@ -626,9 +626,9 @@ APEX_ISSUE_QUEUE(APEX_CPU *cpu){//Will handle grabbing the correct instructions 
 
     //We have a valid instruction to issue
     if(entry_index != 100){
-        
+
         // Remove entry to exetue from IQ and LSQ (if MEM operation)
-        cpu->iq[entry_index].status_bit = 0; 
+        cpu->iq[entry_index].status_bit = 0;
         IQ_Entry issuing_instr = cpu->iq[entry_index];
         if(cpu->iq[entry_index].lsq_id != -1){//If we grabbed an MEM op, make sure to adjust LSQ -J
             cpu->lsq->pop();
@@ -950,7 +950,7 @@ APEX_execute(APEX_CPU *cpu)
             case OPCODE_MOVC:
             {
                 cpu->int_exec.result_buffer = cpu->int_exec.imm;
-                
+
                 /* Set the zero flag based on the result buffer */
                 if (cpu->int_exec.result_buffer == 0) {
                     cpu->zero_flag = TRUE;
@@ -1016,7 +1016,7 @@ APEX_execute(APEX_CPU *cpu)
         }
         cpu->int_exec.has_insn = FALSE;
 
-        
+
 
     }
     /*
@@ -1093,7 +1093,7 @@ APEX_execute(APEX_CPU *cpu)
 
     }
 
-    
+
 
 
 }
@@ -1135,7 +1135,7 @@ APEX_memory(APEX_CPU *cpu)
                             it->status_bit = 1;
                         }
                     }
-                    
+
                     cpu->memory.has_insn = FALSE; //Last stop for a STORE, goes straight to commitment -J
                     break;
                 }
@@ -1242,7 +1242,7 @@ APEX_forward(APEX_CPU* cpu, CPU_Stage forward){//This is where we'll forward the
         cpu->phys_regs[forward.rd].value = forward.result_buffer;
         cpu->phys_regs[forward.rd].src_bit = 1;
 
-    
+
 }
 static void
 APEX_writeback(APEX_CPU *cpu)
@@ -1288,6 +1288,31 @@ APEX_writeback(APEX_CPU *cpu)
         //This will have to be modified when BTB is added -J
         if(cpu->branch_wb.opcode == OPCODE_HALT){
             //No branching when a HALT is hit -J
+            //addresses the instructions that have more cycles that may be cut off once halt hits wb
+              switch(cpu->int_exec.opcode)
+              {
+                case OPCODE_LOAD:
+                case OPCODE_STORE:
+                  printf("Branch_WB opcode = HALT.  Integer FU still has an mem instruction being executed.\n");
+                  /**This fixes the fact that LOAD/STORE doesn't get past the execution stage once HALT hits.
+                    It adds 2 cycles to input6.asm as per required by mem instructions.
+                    Seems that the value @ address put into R1 isn't storing into mem,
+                    but this might also be because i'm not accessing valid mem location -C**/
+                  cpu->int_exec.has_insn = TRUE;
+                  //cpu->fetch_from_next_cycle = TRUE;
+                  break;
+
+              }
+              /** Applying similar concept regarding the above to mult operation  -C **/
+              switch(cpu->mult_exec.opcode)
+              {
+                case OPCODE_MUL:
+                  printf("Mul still being executed\n");
+                default:
+                  break;
+              }
+
+
         }else{
             switch(cpu->branch_exec.opcode){
                 case OPCODE_BZ:
@@ -1416,7 +1441,7 @@ APEX_writeback(APEX_CPU *cpu)
                 printf("Writeback Branch: %s\n", cpu->branch_wb.opcode_str);
             }
 
-            
+
         }
     }
 
@@ -1446,13 +1471,14 @@ APEX_commitment(APEX_CPU* cpu){
                     /* For instructions with destination register: -H
                         - Write contents back into argitectural register
                         - Free up the physical register
-                    */ 
+                    */
                     cpu->arch_regs[rob_entry.ar_addr].value = rob_entry.result;
                     cpu->arch_regs[rob_entry.ar_addr].src_bit = 1;
                     cpu->free_list->push(cpu->rename_table[rob_entry.ar_addr].phys_reg_id);
                     printf("%d RESULT = %d\n", rob_entry.pc_value, rob_entry.result); // Useful for debugging results, so I'm leaving it in -J
                     break;
                 case OPCODE_HALT:
+
                     return 1;
             }
 
