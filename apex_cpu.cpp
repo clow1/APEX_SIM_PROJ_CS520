@@ -675,6 +675,7 @@ APEX_ISSUE_QUEUE(APEX_CPU *cpu){//Will handle grabbing the correct instructions 
                         cpu->int_exec.rd = issuing_instr.dest;
                         cpu->int_exec.imm = issuing_instr.literal;
                         cpu->int_exec.rs1_value = issuing_instr.src1_val;
+
                         break;
 
                     //src1 src2 literal -J
@@ -1288,6 +1289,7 @@ APEX_writeback(APEX_CPU *cpu)
         //This will have to be modified when BTB is added -J
         if(cpu->branch_wb.opcode == OPCODE_HALT){
             //No branching when a HALT is hit -J
+
             //addresses the instructions that have more cycles that may be cut off once halt hits wb
               switch(cpu->int_exec.opcode)
               {
@@ -1299,7 +1301,8 @@ APEX_writeback(APEX_CPU *cpu)
                     Seems that the value @ address put into R1 isn't storing into mem,
                     but this might also be because i'm not accessing valid mem location -C**/
                   cpu->int_exec.has_insn = TRUE;
-                  //cpu->fetch_from_next_cycle = TRUE;
+                  cpu->memory = cpu->int_exec;
+                //  cpu->fetch_from_next_cycle = TRUE;
                   break;
 
               }
@@ -1478,7 +1481,26 @@ APEX_commitment(APEX_CPU* cpu){
                     printf("%d RESULT = %d\n", rob_entry.pc_value, rob_entry.result); // Useful for debugging results, so I'm leaving it in -J
                     break;
                 case OPCODE_HALT:
+                    if (cpu->insn_completed < cpu->code_memory_size) {
+                      printf("HALT has hit commitment, but there are more instructions in the pipeline.\n");
+                      cpu->fetch_from_next_cycle = FALSE;
+                      switch (cpu->memory.opcode){
+                        case OPCODE_LOAD:
+                        case OPCODE_STORE:
+                            printf("from commitment stage: cpu_memory.opcode: %x\n", cpu->memory.opcode);
+                            printf("from commitment stage: memory PC: %d\n", cpu->memory.pc);
 
+
+
+                              cpu->memory.has_insn = TRUE;
+                              cpu->fetch_from_next_cycle = FALSE;
+                              cpu->memory.stage_delay++;
+                              cpu->commitment = cpu->memory;
+
+
+                      }
+                    //  break;
+                    }
                     return 1;
             }
 
