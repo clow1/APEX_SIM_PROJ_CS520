@@ -134,16 +134,6 @@ set_opcode_str(const char *opcode_str)
         return OPCODE_SUBL;
     }
 
-    if (strcmp(opcode_str, "LDI") == 0)
-    {
-        return OPCODE_LDI;
-    }
-
-    if (strcmp(opcode_str, "STI") == 0)
-    {
-        return OPCODE_STI;
-    }
-
     if (strcmp(opcode_str, "CMP") == 0)
     {
         return OPCODE_CMP;
@@ -215,6 +205,8 @@ create_APEX_instruction(APEX_Instruction *ins, char *buffer)
 
     switch (ins->opcode)
     {
+
+        // dest src1 src2
         case OPCODE_ADD:
         case OPCODE_MUL:
         case OPCODE_DIV:
@@ -228,25 +220,23 @@ create_APEX_instruction(APEX_Instruction *ins, char *buffer)
             ins->rs2 = get_num_from_string(tokens[2]);
             break;
         }
-
+        // dest literal
         case OPCODE_MOVC:
         {
-            ins->rd = get_num_from_string(tokens[0]);
-            ins->imm = get_num_from_string(tokens[1]);
-            break;
+          ins->rd = get_num_from_string(tokens[0]);
+          ins->imm = get_num_from_string(tokens[1]);
+          break;
         }
-
         case OPCODE_JUMP:
         {
             ins->rs1 = get_num_from_string(tokens[0]);
             ins->imm = get_num_from_string(tokens[1]);
             break;
         }
-
+        // dest src1 litteral
         case OPCODE_LOAD:
         case OPCODE_ADDL:
         case OPCODE_SUBL:
-        case OPCODE_LDI:
         {
             ins->rd = get_num_from_string(tokens[0]);
             ins->rs1 = get_num_from_string(tokens[1]);
@@ -254,15 +244,8 @@ create_APEX_instruction(APEX_Instruction *ins, char *buffer)
             break;
         }
 
+        //src1 src2 literal
         case OPCODE_STORE:
-        {
-            ins->rs1 = get_num_from_string(tokens[0]);
-            ins->rs2 = get_num_from_string(tokens[1]);
-            ins->imm = get_num_from_string(tokens[2]);
-            break;
-        }
-
-        case OPCODE_STI:
         {
             ins->rs2 = get_num_from_string(tokens[0]);
             ins->rs1 = get_num_from_string(tokens[1]);
@@ -270,6 +253,8 @@ create_APEX_instruction(APEX_Instruction *ins, char *buffer)
             break;
         }
 
+
+        //literal only
         case OPCODE_BP:
         case OPCODE_BNP:
         case OPCODE_BZ:
@@ -279,12 +264,14 @@ create_APEX_instruction(APEX_Instruction *ins, char *buffer)
             break;
         }
 
+        //src1 src2
         case OPCODE_CMP:
         {
             ins->rs1 = get_num_from_string(tokens[0]);
             ins->rs2 = get_num_from_string(tokens[1]);
             break;
         }
+
         case OPCODE_JALR:
         {
             ins->rd = get_num_from_string(tokens[0]);
@@ -296,6 +283,7 @@ create_APEX_instruction(APEX_Instruction *ins, char *buffer)
         {
             ins->rs1 = get_num_from_string(tokens[0]); //unconditionally returns to the address in rs1 -C
         }
+
     }
     /* Fill in rest of the instructions accordingly */
 }
