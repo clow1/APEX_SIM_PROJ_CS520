@@ -88,6 +88,18 @@ print_rename_table(const APEX_CPU *cpu)
     printf("\n");
 }
 
+static void
+print_memory(const APEX_CPU *cpu)
+{
+    printf("\n----------\n%s\n----------\n", "Memory:");
+
+    for (int i=0; i < DATA_MEMORY_SIZE/cpu->code_memory_size; i+=4){
+        printf("| MEM[%d]  \t| Data Value = %d \t|\n", i, cpu->data_memory[i] );
+    }
+    printf("\n");
+    
+}
+
 /*
  * Fetch Stage of APEX Pipeline
  *
@@ -135,8 +147,6 @@ APEX_fetch(APEX_CPU *cpu)
             case OPCODE_OR:
             case OPCODE_EXOR:
             case OPCODE_LOAD:
-            //case OPCODE_LDI:
-            //case OPCODE_STI:
             case OPCODE_STORE:
             case OPCODE_NOP:
                 cpu->fetch.vfu = INT_VFU;
@@ -169,6 +179,10 @@ APEX_fetch(APEX_CPU *cpu)
         if (cpu->fetch.opcode == OPCODE_HALT)
         {
             cpu->fetch.has_insn = FALSE;
+        }
+
+        if (ENABLE_DEBUG_MESSAGES) {
+            printf("Fetch: %s\n", cpu->decode1.opcode_str);
         }
     }
 }
@@ -223,11 +237,10 @@ Stall if free list isn't empty
         if(!available_ROB(cpu) || !available_IQ(cpu)){//All instructions need a slot in the ROB & IQ -J
             cpu->fetch.stall = TRUE; //Stall -J
             return;
-        }else{
-            int memory_op = FALSE;
-
+        } else{
 
             switch (cpu->decode1.opcode){//This switch is for checking LSQ & Free List -J
+                // Operations with a destination register need to be able to allocate a new physical register 
                 case OPCODE_ADD:
                 case OPCODE_ADDL:
                 case OPCODE_SUB:
@@ -237,39 +250,43 @@ Stall if free list isn't empty
                 case OPCODE_AND:
                 case OPCODE_OR:
                 case OPCODE_EXOR:
-                case OPCODE_LOAD:
-                case OPCODE_LDI:
-                    if(cpu->decode1.opcode == OPCODE_LOAD){
-                        //LSQ check -J
-                        if(cpu->lsq->size() == 6){ //LOAD needs both INT_VFU and MEM Unit -J
-                            cpu->fetch.stall = TRUE;
-                            return;
-                        }
-                        memory_op = TRUE;
-                    }
+                    //Free List check -J
                    if(cpu->free_list->empty()){
-                        //Free List check -J
                         cpu->fetch.stall = TRUE;
-                        return;
-                    }else{
-                        break;
                     }
+                    break;
+
+                // Memory operations w/ destination regsiter 
+                case OPCODE_LOAD:
+
+                    //LSQ / Free List check  -J
+                    if(cpu->lsq->size() == 6 || cpu->free_list->empty()){ //LOAD needs both INT_VFU and MEM Unit -J
+                        cpu->fetch.stall = TRUE;
+                    }
+                    break;
+
+                // Memory operation w/out destination register
                 case OPCODE_STORE:
-                //case OPCODE_STI:
+
                     //LSQ check -J
-                    memory_op = TRUE;
                     if(cpu->lsq->size() == 6){
                         cpu->fetch.stall = TRUE;
-                        return;
                     }
+                    break;
             }
             //Do decode1 stuff, but check instruction types
             //cpu->fetch.has_insn = TRUE; //Might have to change this, not sure how this might interact with branches/HALTs -J
 
-            
-            cpu->decode2 = cpu->decode1;
-            cpu->decode1.has_insn = FALSE;
-            cpu->fetch.stall = FALSE;
+            // If we are waiting on a resource stall
+            if (cpu->fetch.stall != TRUE) {
+                cpu->decode2 = cpu->decode1;
+                cpu->decode1.has_insn = FALSE;
+                cpu->fetch.stall = FALSE;
+            }    
+        }
+
+        if (ENABLE_DEBUG_MESSAGES) {
+            printf("Decode 1: %s\n", cpu->decode2.opcode_str);
         }
     }
 
@@ -291,7 +308,6 @@ Rj <-- Rk <op> Rl
        int free_reg = -1; //If it stays -1, then we know that it's an instruction w/o a destination
 
        // Insert entry into ROB before renaming -H
-       int memory_op = FALSE;
        ROB_Entry rob_entry;
        rob_entry.pc_value = cpu->decode2.pc;
        rob_entry.ar_addr = cpu->decode2.rd;
@@ -320,6 +336,7 @@ Rj <-- Rk <op> Rl
                 //<dest> <- <src1> <op> <literal> -H
                 case OPCODE_ADDL:
                 case OPCODE_SUBL:
+                case OPCODE_LOAD:
                 case OPCODE_JALR:
                     cpu->decode2.rs1 = cpu->rename_table[cpu->decode2.rs1].phys_reg_id;
                     free_reg = cpu->free_list->front();
@@ -332,21 +349,9 @@ Rj <-- Rk <op> Rl
                 //<dest> <- #<literal> -J
                 case OPCODE_MOVC:
                     free_reg = cpu->free_list->front();
-                    printf("Free Register: %d\n", free_reg);
                     cpu->free_list->pop();
-                    printf("Destination Register: %d\n", cpu->decode2.rd);
                     cpu->rename_table[cpu->decode2.rd].phys_reg_id = free_reg;
                     // Set the destination register to the physical register just retrieved from the free list -H
-                    cpu->decode2.rd = free_reg;
-                    cpu->phys_regs[cpu->decode2.rd].src_bit = 0;
-                    break;
-
-                // <dest> <- <src2> <literal> -H
-                case OPCODE_LOAD:
-                    cpu->decode2.rs2 = cpu->rename_table[cpu->decode2.rs2].phys_reg_id;
-                    free_reg = cpu->free_list->front();
-                    cpu->free_list->pop();
-                    cpu->rename_table[cpu->decode2.rd].phys_reg_id = free_reg;
                     cpu->decode2.rd = free_reg;
                     cpu->phys_regs[cpu->decode2.rd].src_bit = 0;
                     break;
@@ -356,8 +361,6 @@ Rj <-- Rk <op> Rl
                 //<op> <src1> <src2> -J
                 case OPCODE_STORE:
                 case OPCODE_CMP:
-                //// Don't see STI in write-up either //////
-                //case OPCODE_STI:
                     cpu->decode2.rs1 = cpu->rename_table[cpu->decode2.rs1].phys_reg_id;
                     cpu->decode2.rs2 = cpu->rename_table[cpu->decode2.rs2].phys_reg_id;
                     break;
@@ -372,17 +375,16 @@ Rj <-- Rk <op> Rl
                 // BZ, BNZ, BP, and BNP don't have any source registers therefore require no action in the rename stage -H
             }
 
-        char entry_index = index_IQ(cpu);
-
         //Filling out IQ entry -J
+        char entry_index = index_IQ(cpu);
         cpu->iq[entry_index].status_bit = 1;
         cpu->iq[entry_index].fu_type = cpu->decode2.vfu;
         cpu->iq[entry_index].opcode = cpu->decode2.opcode;
         switch(cpu->decode2.opcode){//Instructions w/ literals -J
+            case OPCODE_ADDL:
+            case OPCODE_SUBL:
             case OPCODE_LOAD:
-            //case OPCODE_LDI:
             case OPCODE_STORE:
-            //case OPCODE_STI:
             case OPCODE_JUMP:
             case OPCODE_MOVC:
             case OPCODE_BP:
@@ -391,9 +393,6 @@ Rj <-- Rk <op> Rl
             case OPCODE_BZ:
             case OPCODE_BNZ:
                 cpu->iq[entry_index].literal = cpu->decode2.imm;
-
-
-
         }
 
         switch(cpu->decode2.opcode){//Instructions w/ src1 -J
@@ -405,9 +404,8 @@ Rj <-- Rk <op> Rl
             case OPCODE_AND:
             case OPCODE_OR:
             case OPCODE_EXOR:
-            //case OPCODE_LDI:
+            case OPCODE_LOAD:
             case OPCODE_STORE:
-            //case OPCODE_STI:
             case OPCODE_JUMP:
             case OPCODE_JALR:
             case OPCODE_RET:
@@ -424,14 +422,11 @@ Rj <-- Rk <op> Rl
             case OPCODE_ADD:
             case OPCODE_ADDL:
             case OPCODE_SUB:
-            case OPCODE_SUBL:
             case OPCODE_MUL:
             case OPCODE_AND:
             case OPCODE_OR:
             case OPCODE_EXOR:
-            case OPCODE_LOAD:
             case OPCODE_STORE:
-            //case OPCODE_STI:
             case OPCODE_CMP:
                 cpu->iq[entry_index].src2_rdy_bit = cpu->phys_regs[cpu->decode2.rs2].src_bit;
                 cpu->iq[entry_index].src2_tag = cpu->decode2.rs2;
@@ -452,7 +447,6 @@ Rj <-- Rk <op> Rl
             case OPCODE_MOVC:
             case OPCODE_JALR:
             case OPCODE_LOAD:
-            //case OPCODE_LDI:
                 cpu->iq[entry_index].dest = cpu->decode2.rd;
                 break;
 
@@ -471,8 +465,6 @@ Rj <-- Rk <op> Rl
                 }
                 cpu->lsq->push(cpu->iq[entry_index]);
                 break;
-
-
         }
 
      /*
@@ -491,6 +483,10 @@ Rj <-- Rk <op> Rl
 
         cpu->decode2.has_insn = FALSE;
         //We don't forward data in pipeline to exec right away like before bc IQ is Out-of-Order -J
+
+        if (ENABLE_DEBUG_MESSAGES) {
+            printf("Decode 2: %s\n", cpu->decode2.opcode_str);
+        }
     }
 }
 
@@ -504,7 +500,6 @@ static int check_LSQ(APEX_CPU* cpu, int entry_index){
         3) Memory is free
         */
         case OPCODE_LOAD:
-        case OPCODE_LDI:
             if(!cpu->memory.has_insn &&
                 cpu->iq[entry_index].pc_value == cpu->lsq->front().pc_value){
                 return entry_index;
@@ -517,7 +512,6 @@ static int check_LSQ(APEX_CPU* cpu, int entry_index){
         3) When memory is free
         */
         case OPCODE_STORE:
-        case OPCODE_STI:
             if(!cpu->memory.has_insn &&
                 cpu->iq[entry_index].pc_value == cpu->lsq->front().pc_value &&
                 cpu->iq[entry_index].pc_value == cpu->rob->front().pc_value){
@@ -583,7 +577,6 @@ APEX_ISSUE_QUEUE(APEX_CPU *cpu){//Will handle grabbing the correct instructions 
                 case OPCODE_OR:
                 case OPCODE_EXOR:
                 case OPCODE_STORE:
-                //case OPCODE_STI:
                 case OPCODE_CMP:
                     // Check if the physical register is valid for both source registers
                     if(cpu->phys_regs[cpu->iq[i].src1_tag].src_bit && cpu->phys_regs[cpu->iq[i].src2_tag].src_bit){
@@ -596,24 +589,13 @@ APEX_ISSUE_QUEUE(APEX_CPU *cpu){//Will handle grabbing the correct instructions 
                     }
                     break;
 
-                //Look at instr with only src1
+                //Look at instr with only src1 -H
                 case OPCODE_ADDL: 
                 case OPCODE_SUBL:
-                //case OPCODE_LDI:
+                case OPCODE_LOAD:
                 case OPCODE_JUMP:
                 case OPCODE_RET: //Added this since it has only src1 -C
                     if(cpu->phys_regs[cpu->iq[i].src1_tag].src_bit){
-                        if(entry_index == 100){
-                            entry_index = i;
-                        }else{
-                            entry_index = tiebreaker_IQ(cpu, entry_index, i);
-                        }
-                    }
-                    break;
-
-                //Look at instr with only src2 -H
-                case OPCODE_LOAD:
-                    if(cpu->phys_regs[cpu->iq[i].src2_tag].src_bit){
                         if(entry_index == 100){
                             entry_index = i;
                         }else{
@@ -653,7 +635,6 @@ APEX_ISSUE_QUEUE(APEX_CPU *cpu){//Will handle grabbing the correct instructions 
             cpu->iq[entry_index].lsq_id = -1;//Reset lsq_id field for later checks -J
         }
 
-
         switch (cpu->iq[entry_index].fu_type){
             case MUL_VFU:
                 cpu->mult_exec.pc = issuing_instr.pc_value;
@@ -689,24 +670,19 @@ APEX_ISSUE_QUEUE(APEX_CPU *cpu){//Will handle grabbing the correct instructions 
                     //dest src1 literal -J
                     case OPCODE_ADDL:
                     case OPCODE_SUBL:
-                    //case OPCODE_LDI:
+                    case OPCODE_LOAD:
                         cpu->int_exec.rs1 = issuing_instr.src1_tag;
                         cpu->int_exec.rd = issuing_instr.dest;
                         cpu->int_exec.imm = issuing_instr.literal;
                         cpu->int_exec.rs1_value = issuing_instr.src1_val;
                         break;
 
-                    //dest src2 literal -H
-                    case OPCODE_LOAD:
-                        cpu->int_exec.rs2 = issuing_instr.src2_tag;
-                        cpu->int_exec.rd = issuing_instr.dest;
-                        cpu->int_exec.imm = issuing_instr.literal;
-                        cpu->int_exec.rs2_value = issuing_instr.src2_val;
-                        break;
-
                     //src1 src2 literal -J
-                    //case OPCODE_STI:
                     case OPCODE_STORE:
+                    printf("Rs1: %d\n", issuing_instr.src1_tag);
+                    printf("Rs2: %d\n", issuing_instr.src2_tag);
+                    printf("Rs1 Value: %d\n", issuing_instr.src1_val);
+                    printf("Rs2 Value: %d\n", issuing_instr.src2_val);
                         cpu->int_exec.rs1 = issuing_instr.src1_tag;
                         cpu->int_exec.rs2 = issuing_instr.src2_tag;
                         cpu->int_exec.imm = issuing_instr.literal;
@@ -810,6 +786,10 @@ APEX_execute(APEX_CPU *cpu)
         } else{
             // Increment cyle delay counter
             cpu->mult_exec.stage_delay++;
+        }
+
+        if (ENABLE_DEBUG_MESSAGES) {
+            printf("Execute Int: %s\n", cpu->mult_wb.opcode_str);
         }
     }
 
@@ -970,8 +950,7 @@ APEX_execute(APEX_CPU *cpu)
             case OPCODE_MOVC:
             {
                 cpu->int_exec.result_buffer = cpu->int_exec.imm;
-                printf("Result Buffer: %d\n", cpu->int_exec.result_buffer );
-
+                
                 /* Set the zero flag based on the result buffer */
                 if (cpu->int_exec.result_buffer == 0) {
                     cpu->zero_flag = TRUE;
@@ -1004,43 +983,40 @@ APEX_execute(APEX_CPU *cpu)
                 }
             }
 
-            /*  LOAD <dest> <src2> <literal>
-               STORE <src1> <src2> <literal>
-               Both LOAD and STORE calculate their memory address from the second source register and it's literal -H
-            */ 
-            case OPCODE_STORE:
+            // LOAD <dest> <src2> <literal> -H
             case OPCODE_LOAD:
             {
                 mem_instruction = TRUE;
                 cpu->int_exec.memory_address
+                    = cpu->int_exec.rs1_value + cpu->int_exec.imm;
+                printf("Memory Address: %d\n", cpu->int_exec.memory_address);
+                break;
+            }
+
+            // STORE <src1> <src2> <literal> -H
+            case OPCODE_STORE:
+            {
+                mem_instruction = TRUE;
+                cpu->int_exec.memory_address
                     = cpu->int_exec.rs2_value + cpu->int_exec.imm;
+                printf("Memory Address: %d\n", cpu->int_exec.memory_address);
                 break;
             }
-
-            /*case OPCODE_STI:
-            {
-                mem_instruction = TRUE;
-                cpu->int_exec.memory_address
-                    = cpu->int_exec.rs1_value + cpu->int_exec.imm;
-                cpu->int_exec.inc_address_buffer = cpu->int_exec.rs1_value + 4;
-                break;
-            }
-
-            case OPCODE_LDI:
-            {
-                mem_instruction = TRUE;
-                cpu->int_exec.memory_address
-                    = cpu->int_exec.rs1_value + cpu->int_exec.imm;
-                cpu->int_exec.inc_address_buffer = cpu->int_exec.rs1_value + 4;
-                break;
-            }*/
         }
+
+        if (ENABLE_DEBUG_MESSAGES) {
+            printf("Execute Int: %s\n", cpu->int_exec.opcode_str);
+        }
+
         if(mem_instruction){
+            printf("Memory Instruction!!!! \n");
             cpu->memory = cpu->int_exec; //Memory has its own stage
         } else{
             cpu->int_wb = cpu->int_exec;
         }
         cpu->int_exec.has_insn = FALSE;
+
+        
 
     }
     /*
@@ -1111,7 +1087,15 @@ APEX_execute(APEX_CPU *cpu)
         cpu->branch_wb = cpu->branch_exec;
         cpu->branch_exec.has_insn = FALSE;
 
+        if (ENABLE_DEBUG_MESSAGES) {
+            printf("Execute Branch: %s\n", cpu->branch_wb.opcode_str);
+        }
+
     }
+
+    
+
+
 }
 
 /*
@@ -1127,7 +1111,6 @@ APEX_memory(APEX_CPU *cpu)
         if(cpu->memory.stage_delay == 2){
             switch (cpu->memory.opcode)
             {
-                //case OPCODE_LDI:
                 case OPCODE_LOAD:
                 {
                     /* Read from data memory */
@@ -1140,25 +1123,30 @@ APEX_memory(APEX_CPU *cpu)
 
                 case OPCODE_STORE:
                 {
+                    printf("Rs1 Value: %d\n", cpu->memory.rs1_value);
+                    printf("Memory data: %d\n", cpu->data_memory[cpu->memory.memory_address]);
                     /*Write data into memory*/
                     cpu->data_memory[cpu->memory.memory_address] = cpu->memory.rs1_value;
-                    cpu->commitment = cpu->memory;
+
+                    // Since the STORE instruction doesn't require the WB stage set the ROB entry valid bit so it can commit -H
+                    for(auto it = cpu->rob->begin(); it != cpu->rob->end(); it++){
+
+                        if(cpu->memory.pc == it->pc_value){
+                            it->status_bit = 1;
+                        }
+                    }
+                    
                     cpu->memory.has_insn = FALSE; //Last stop for a STORE, goes straight to commitment -J
                     break;
                 }
-
-                /*case OPCODE_STI:
-                {
-                    //Write data into memory
-                    cpu->data_memory[cpu->memory.memory_address] = cpu->memory.rs2_value;
-                    cpu->mem_wb = cpu->memory;
-                    cpu->memory.has_insn = FALSE;
-                    break;
-                }*/
             }
             cpu->memory.stage_delay = 1;
         }else{
             cpu->memory.stage_delay++;
+        }
+
+        if (ENABLE_DEBUG_MESSAGES) {
+            //printf("Memory: %s\n", cpu->memory.opcode);
         }
 
     }
@@ -1208,8 +1196,9 @@ APEX_forward(APEX_CPU* cpu, CPU_Stage forward){//This is where we'll forward the
                 }
             }
             break;
-        //LDI has to forward 2 values, rd & src1 -J
-        /*case OPCODE_LDI:
+
+        //Has to forward both src1 and dest. Same as LDI -C
+        case OPCODE_JALR:
             for(int i = 0; i < 8; i++){
                 if(cpu->iq[i].status_bit == 1){
                     if(cpu->iq[i].src1_tag == forward.rd){
@@ -1231,67 +1220,14 @@ APEX_forward(APEX_CPU* cpu, CPU_Stage forward){//This is where we'll forward the
 
                 }
             }
-                    //Do the same for ROB
+
             for(auto it = cpu->rob->begin(); it != cpu->rob->end(); it++){
                 if(forward.pc == it->pc_value){
                     it->status_bit = 1;
                     it->result = forward.result_buffer;
                 }
             }
-            break;*/
-        //STI only forwards src1 -J
-        /*case OPCODE_STI:
-            for(int i = 0; i < 8; i++){
-                if(cpu->iq[i].status_bit == 1){
-                    if(cpu->iq[i].src1_tag == forward.rs1){
-                        cpu->iq[i].src1_val = forward.inc_address_buffer;
-                        cpu->iq[i].src1_rdy_bit = 1;
-                    }
-                    if(cpu->iq[i].src2_tag == forward.rs1){
-                        cpu->iq[i].src2_val = forward.inc_address_buffer;
-                        cpu->iq[i].src2_rdy_bit = 1;
-                    }
-
-                }
-            }
-            for(auto it = cpu->rob->begin(); it != cpu->rob->end(); it++){
-                if(forward.pc == it->pc_value){
-                    it->status_bit = 1;
-                    it->result = forward.inc_address_buffer;
-                }
-            }
-            break;*/
-        //Has to forward both src1 and dest. Same as LDI -C
-        case OPCODE_JALR:
-        for(int i = 0; i < 8; i++){
-            if(cpu->iq[i].status_bit == 1){
-                if(cpu->iq[i].src1_tag == forward.rd){
-                    cpu->iq[i].src1_val = forward.result_buffer;
-                    cpu->iq[i].src1_rdy_bit = 1;
-                }
-                if(cpu->iq[i].src2_tag == forward.rd){
-                    cpu->iq[i].src2_val = forward.result_buffer;
-                    cpu->iq[i].src2_rdy_bit = 1;
-                }
-                if(cpu->iq[i].src1_tag == forward.rs1){
-                    cpu->iq[i].src1_val = forward.inc_address_buffer;
-                    cpu->iq[i].src1_rdy_bit = 1;
-                }
-                if(cpu->iq[i].src2_tag == forward.rs1){
-                    cpu->iq[i].src2_val = forward.inc_address_buffer;
-                    cpu->iq[i].src2_rdy_bit = 1;
-                }
-
-            }
-        }
-
-        for(auto it = cpu->rob->begin(); it != cpu->rob->end(); it++){
-            if(forward.pc == it->pc_value){
-                it->status_bit = 1;
-                it->result = forward.result_buffer;
-            }
-        }
-        break;
+            break;
 
         //ADD OTHER BRANCHES HERE -J
         case OPCODE_HALT:
@@ -1302,14 +1238,11 @@ APEX_forward(APEX_CPU* cpu, CPU_Stage forward){//This is where we'll forward the
             }
             break;
     }
-    if(forward.opcode == OPCODE_STI){
-        cpu->phys_regs[forward.rd].value = forward.inc_address_buffer;
-        cpu->phys_regs[forward.rd].src_bit = 1;
-    }else{
+
         cpu->phys_regs[forward.rd].value = forward.result_buffer;
         cpu->phys_regs[forward.rd].src_bit = 1;
 
-    }
+    
 }
 static void
 APEX_writeback(APEX_CPU *cpu)
@@ -1320,22 +1253,34 @@ APEX_writeback(APEX_CPU *cpu)
         APEX_forward(cpu, cpu->mult_wb);
         cpu->rename_table[CC_INDEX].phys_reg_id = cpu->mult_wb.rd;
         cpu->mult_wb.has_insn = FALSE;
+
+        if (ENABLE_DEBUG_MESSAGES) {
+            //printf("Writeback MUL: %s\n", cpu->mult_wb.opcode);
+        }
     }
     // Int operations writeback stage -H
     if(cpu->int_wb.has_insn){
         APEX_forward(cpu, cpu->int_wb);
         cpu->rename_table[CC_INDEX].phys_reg_id = cpu->mult_wb.rd;
         cpu->int_wb.has_insn = FALSE;
+
+        if (ENABLE_DEBUG_MESSAGES) {
+            printf("Writeback Int: %s\n", cpu->int_wb.opcode_str);
+        }
     }
     if(cpu->mem_wb.has_insn){
         APEX_forward(cpu, cpu->mem_wb);
         switch(cpu->mem_wb.opcode){
             case OPCODE_LOAD:
-            case OPCODE_LDI:
+            //case OPCODE_LDI:
                 cpu->rename_table[CC_INDEX].phys_reg_id = cpu->mult_wb.rd;
             break;
         }
         cpu->mem_wb.has_insn = FALSE;
+
+        if (ENABLE_DEBUG_MESSAGES) {
+            printf("Writeback Mem: %s\n", cpu->mem_wb.opcode_str);
+        }
     }
     if(cpu->branch_wb.has_insn){
         APEX_forward(cpu, cpu->branch_wb);
@@ -1467,6 +1412,11 @@ APEX_writeback(APEX_CPU *cpu)
                             cpu->fetch.has_insn = TRUE;
                     }
             }
+            if (ENABLE_DEBUG_MESSAGES) {
+                printf("Writeback Branch: %s\n", cpu->branch_wb.opcode_str);
+            }
+
+            
         }
     }
 
@@ -1481,6 +1431,7 @@ APEX_commitment(APEX_CPU* cpu){
         ROB_Entry rob_entry = cpu->rob->front();
         if(rob_entry.status_bit == 1){
             cpu->rob->pop_front();
+
             switch (rob_entry.opcode){
                 case OPCODE_ADD:
                 case OPCODE_LOAD:
@@ -1492,18 +1443,24 @@ APEX_commitment(APEX_CPU* cpu){
                 case OPCODE_OR:
                 case OPCODE_EXOR:
                 case OPCODE_MUL:
-                case OPCODE_LDI:
-                case OPCODE_STI:
+                    /* For instructions with destination register: -H
+                        - Write contents back into argitectural register
+                        - Free up the physical register
+                    */ 
                     cpu->arch_regs[rob_entry.ar_addr].value = rob_entry.result;
                     cpu->arch_regs[rob_entry.ar_addr].src_bit = 1;
+                    cpu->free_list->push(cpu->rename_table[rob_entry.ar_addr].phys_reg_id);
                     printf("%d RESULT = %d\n", rob_entry.pc_value, rob_entry.result); // Useful for debugging results, so I'm leaving it in -J
                     break;
                 case OPCODE_HALT:
                     return 1;
             }
-            //Free up phys reg
-            cpu->free_list->push(cpu->rename_table[rob_entry.ar_addr].phys_reg_id);
+
             cpu->insn_completed++;
+
+            if (ENABLE_DEBUG_MESSAGES) {
+                printf("Commit: ");
+            }
         }
     }
     return 0;
@@ -1660,6 +1617,7 @@ APEX_cpu_run(APEX_CPU *cpu)
         print_reg_file(cpu);
         print_phys_reg_file(cpu);
         print_rename_table(cpu);
+        print_memory(cpu);
         printf("\n\n\n\n");
 
         if (cpu->single_step)
