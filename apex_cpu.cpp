@@ -97,7 +97,7 @@ print_memory(const APEX_CPU *cpu)
         printf("| MEM[%d]  \t| Data Value = %d \t|\n", i, cpu->data_memory[i] );
     }
     printf("\n");
-    
+
 }
 
 /*
@@ -240,7 +240,7 @@ Stall if free list isn't empty
         } else{
 
             switch (cpu->decode1.opcode){//This switch is for checking LSQ & Free List -J
-                // Operations with a destination register need to be able to allocate a new physical register 
+                // Operations with a destination register need to be able to allocate a new physical register
                 case OPCODE_ADD:
                 case OPCODE_ADDL:
                 case OPCODE_SUB:
@@ -256,7 +256,7 @@ Stall if free list isn't empty
                     }
                     break;
 
-                // Memory operations w/ destination regsiter 
+                // Memory operations w/ destination regsiter
                 case OPCODE_LOAD:
 
                     //LSQ / Free List check  -J
@@ -282,7 +282,7 @@ Stall if free list isn't empty
                 cpu->decode2 = cpu->decode1;
                 cpu->decode1.has_insn = FALSE;
                 cpu->fetch.stall = FALSE;
-            }    
+            }
         }
 
         if (ENABLE_DEBUG_MESSAGES) {
@@ -590,7 +590,7 @@ APEX_ISSUE_QUEUE(APEX_CPU *cpu){//Will handle grabbing the correct instructions 
                     break;
 
                 //Look at instr with only src1 -H
-                case OPCODE_ADDL: 
+                case OPCODE_ADDL:
                 case OPCODE_SUBL:
                 case OPCODE_LOAD:
                 case OPCODE_JUMP:
@@ -626,9 +626,9 @@ APEX_ISSUE_QUEUE(APEX_CPU *cpu){//Will handle grabbing the correct instructions 
 
     //We have a valid instruction to issue
     if(entry_index != 100){
-        
+
         // Remove entry to exetue from IQ and LSQ (if MEM operation)
-        cpu->iq[entry_index].status_bit = 0; 
+        cpu->iq[entry_index].status_bit = 0;
         IQ_Entry issuing_instr = cpu->iq[entry_index];
         if(cpu->iq[entry_index].lsq_id != -1){//If we grabbed an MEM op, make sure to adjust LSQ -J
             cpu->lsq->pop();
@@ -675,6 +675,7 @@ APEX_ISSUE_QUEUE(APEX_CPU *cpu){//Will handle grabbing the correct instructions 
                         cpu->int_exec.rd = issuing_instr.dest;
                         cpu->int_exec.imm = issuing_instr.literal;
                         cpu->int_exec.rs1_value = issuing_instr.src1_val;
+
                         break;
 
                     //src1 src2 literal -J
@@ -947,7 +948,7 @@ APEX_execute(APEX_CPU *cpu)
             case OPCODE_MOVC:
             {
                 cpu->int_exec.result_buffer = cpu->int_exec.imm;
-                
+
                 /* Set the zero flag based on the result buffer */
                 if (cpu->int_exec.result_buffer == 0) {
                     cpu->zero_flag = TRUE;
@@ -1019,7 +1020,7 @@ APEX_execute(APEX_CPU *cpu)
         }
         
 
-        
+
 
     }
     /*
@@ -1096,7 +1097,7 @@ APEX_execute(APEX_CPU *cpu)
 
     }
 
-    
+
 
 
 }
@@ -1137,7 +1138,7 @@ APEX_memory(APEX_CPU *cpu)
                             it->status_bit = 1;
                         }
                     }
-                    
+
                     cpu->memory.has_insn = FALSE; //Last stop for a STORE, goes straight to commitment -J
                     break;
                 }
@@ -1249,7 +1250,7 @@ APEX_forward(APEX_CPU* cpu, CPU_Stage forward){//This is where we'll forward the
         cpu->phys_regs[forward.rd].value = forward.result_buffer;
         cpu->phys_regs[forward.rd].src_bit = 1;
 
-    
+
 }
 static void
 APEX_writeback(APEX_CPU *cpu)
@@ -1279,7 +1280,6 @@ APEX_writeback(APEX_CPU *cpu)
         APEX_forward(cpu, cpu->mem_wb);
         switch(cpu->mem_wb.opcode){
             case OPCODE_LOAD:
-            //case OPCODE_LDI:
                 cpu->rename_table[CC_INDEX].phys_reg_id = cpu->mult_wb.rd;
             break;
         }
@@ -1423,7 +1423,7 @@ APEX_writeback(APEX_CPU *cpu)
                 printf("Writeback Branch: %d\n", cpu->branch_wb.opcode);
             }
 
-            
+
         }
     }
 
@@ -1453,7 +1453,7 @@ APEX_commitment(APEX_CPU* cpu){
                     /* For instructions with destination register: -H
                         - Write contents back into argitectural register
                         - Free up the physical register
-                    */ 
+                    */
                     cpu->arch_regs[rob_entry.ar_addr].value = rob_entry.result;
                     cpu->arch_regs[rob_entry.ar_addr].src_bit = 1;
                     cpu->free_list->push(cpu->rename_table[rob_entry.ar_addr].phys_reg_id);
