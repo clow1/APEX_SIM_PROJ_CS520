@@ -93,7 +93,7 @@ print_memory(const APEX_CPU *cpu)
 {
     printf("\n----------\n%s\n----------\n", "Memory:");
 
-    for (int i=0; i < DATA_MEMORY_SIZE/cpu->code_memory_size; i+=4){
+    for (int i=0; i < DATA_MEMORY_SIZE/cpu->code_memory_size; i+=2){
         printf("| MEM[%d]  \t| Data Value = %d \t|\n", i, cpu->data_memory[i] );
     }
     printf("\n");
@@ -679,10 +679,6 @@ APEX_ISSUE_QUEUE(APEX_CPU *cpu){//Will handle grabbing the correct instructions 
 
                     //src1 src2 literal -J
                     case OPCODE_STORE:
-                    printf("Rs1: %d\n", issuing_instr.src1_tag);
-                    printf("Rs2: %d\n", issuing_instr.src2_tag);
-                    printf("Rs1 Value: %d\n", issuing_instr.src1_val);
-                    printf("Rs2 Value: %d\n", issuing_instr.src2_val);
                         cpu->int_exec.rs1 = issuing_instr.src1_tag;
                         cpu->int_exec.rs2 = issuing_instr.src2_tag;
                         cpu->int_exec.imm = issuing_instr.literal;
@@ -757,7 +753,7 @@ APEX_execute(APEX_CPU *cpu)
         Multiplication section
     */
     if(cpu->mult_exec.has_insn){
-        if(cpu->mult_exec.stage_delay == 4){
+        if(cpu->mult_exec.stage_delay < 4){
             switch (cpu->mult_exec.opcode){
                 case OPCODE_MUL:
                 {
@@ -780,7 +776,6 @@ APEX_execute(APEX_CPU *cpu)
                     break;
                 }
             }
-            cpu->mult_exec.stage_delay = 1;
             cpu->mult_wb = cpu->mult_exec;
             cpu->mult_exec.has_insn = FALSE;
         } else{
@@ -789,14 +784,16 @@ APEX_execute(APEX_CPU *cpu)
         }
 
         if (ENABLE_DEBUG_MESSAGES) {
-            printf("Execute Int: %s\n", cpu->mult_wb.opcode_str);
+            printf("Execute Mul: %d\n", cpu->mult_exec.opcode);
         }
     }
 
     /*
         Integer section
+        Check if there is a valid instruction to process, since memory instructions take 2 cycles in the memory stage we need to check for stalls -H
     */
-    if(cpu->int_exec.has_insn){
+    
+    if(cpu->int_exec.has_insn && !cpu->int_exec.stall){
         int mem_instruction = FALSE;
 
         switch (cpu->int_exec.opcode){
@@ -989,7 +986,6 @@ APEX_execute(APEX_CPU *cpu)
                 mem_instruction = TRUE;
                 cpu->int_exec.memory_address
                     = cpu->int_exec.rs1_value + cpu->int_exec.imm;
-                printf("Memory Address: %d\n", cpu->int_exec.memory_address);
                 break;
             }
 
@@ -999,22 +995,29 @@ APEX_execute(APEX_CPU *cpu)
                 mem_instruction = TRUE;
                 cpu->int_exec.memory_address
                     = cpu->int_exec.rs2_value + cpu->int_exec.imm;
-                printf("Memory Address: %d\n", cpu->int_exec.memory_address);
                 break;
             }
         }
 
         if (ENABLE_DEBUG_MESSAGES) {
-            printf("Execute Int: %s\n", cpu->int_exec.opcode_str);
+            printf("Execute Int: %d\n", cpu->int_exec.opcode);
         }
 
         if(mem_instruction){
-            printf("Memory Instruction!!!! \n");
-            cpu->memory = cpu->int_exec; //Memory has its own stage
+            
+            // Memory instructions require 2 cycles, therefore we need to stall if a second memory instruction immedietly follows another -H  
+            if(cpu->memory.has_insn) {
+                cpu->int_exec.stall = TRUE;
+            } else {
+                // If there is no instruction currently in the mem stage advance current instruction to next stage -H
+                cpu->memory = cpu->int_exec; //Memory has its own stage
+                cpu->int_exec.has_insn = FALSE;
+            }
         } else{
             cpu->int_wb = cpu->int_exec;
+            cpu->int_exec.has_insn = FALSE;
         }
-        cpu->int_exec.has_insn = FALSE;
+        
 
         
 
@@ -1088,7 +1091,7 @@ APEX_execute(APEX_CPU *cpu)
         cpu->branch_exec.has_insn = FALSE;
 
         if (ENABLE_DEBUG_MESSAGES) {
-            printf("Execute Branch: %s\n", cpu->branch_wb.opcode_str);
+            printf("Execute Branch: %d\n", cpu->branch_wb.opcode);
         }
 
     }
@@ -1108,7 +1111,8 @@ APEX_memory(APEX_CPU *cpu)
 {
     if (cpu->memory.has_insn)
     {
-        if(cpu->memory.stage_delay == 2){
+        if(cpu->memory.stage_delay < 2){
+            
             switch (cpu->memory.opcode)
             {
                 case OPCODE_LOAD:
@@ -1123,8 +1127,6 @@ APEX_memory(APEX_CPU *cpu)
 
                 case OPCODE_STORE:
                 {
-                    printf("Rs1 Value: %d\n", cpu->memory.rs1_value);
-                    printf("Memory data: %d\n", cpu->data_memory[cpu->memory.memory_address]);
                     /*Write data into memory*/
                     cpu->data_memory[cpu->memory.memory_address] = cpu->memory.rs1_value;
 
@@ -1140,13 +1142,18 @@ APEX_memory(APEX_CPU *cpu)
                     break;
                 }
             }
-            cpu->memory.stage_delay = 1;
+
+            // The mem instruction is complete, check if another mem operation is being stalled in exe stage -H
+            if(cpu->int_exec.stall) {
+                cpu->int_exec.stall = FALSE;
+            }
+
         }else{
             cpu->memory.stage_delay++;
         }
 
         if (ENABLE_DEBUG_MESSAGES) {
-            //printf("Memory: %s\n", cpu->memory.opcode);
+            printf("Memory: %d\n", cpu->memory.opcode);
         }
 
     }
@@ -1255,7 +1262,7 @@ APEX_writeback(APEX_CPU *cpu)
         cpu->mult_wb.has_insn = FALSE;
 
         if (ENABLE_DEBUG_MESSAGES) {
-            //printf("Writeback MUL: %s\n", cpu->mult_wb.opcode);
+            printf("Writeback MUL: %d\n", cpu->mult_wb.opcode);
         }
     }
     // Int operations writeback stage -H
@@ -1265,7 +1272,7 @@ APEX_writeback(APEX_CPU *cpu)
         cpu->int_wb.has_insn = FALSE;
 
         if (ENABLE_DEBUG_MESSAGES) {
-            printf("Writeback Int: %s\n", cpu->int_wb.opcode_str);
+            printf("Writeback Int: %d\n", cpu->int_wb.opcode);
         }
     }
     if(cpu->mem_wb.has_insn){
@@ -1279,7 +1286,7 @@ APEX_writeback(APEX_CPU *cpu)
         cpu->mem_wb.has_insn = FALSE;
 
         if (ENABLE_DEBUG_MESSAGES) {
-            printf("Writeback Mem: %s\n", cpu->mem_wb.opcode_str);
+            printf("Writeback Mem: %d\n", cpu->mem_wb.opcode);
         }
     }
     if(cpu->branch_wb.has_insn){
@@ -1413,7 +1420,7 @@ APEX_writeback(APEX_CPU *cpu)
                     }
             }
             if (ENABLE_DEBUG_MESSAGES) {
-                printf("Writeback Branch: %s\n", cpu->branch_wb.opcode_str);
+                printf("Writeback Branch: %d\n", cpu->branch_wb.opcode);
             }
 
             
