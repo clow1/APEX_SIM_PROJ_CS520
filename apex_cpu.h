@@ -48,6 +48,14 @@ typedef struct CPU_Stage
     int stall; //Make it easier to explicitly stall instructions waiting for ROB/IQ/LSQ -J
 } CPU_Stage;
 
+//Branch table unit -C
+typedef struct BT_Entry     //will likely need more ENTRIES
+{
+  int addr;
+  int branch_pc;
+  int predict_pc;
+  int taken; //0 = not taken, 1 = taken
+}BT_Entry;
 
 /*branch predicution unit struct*/
 
@@ -59,11 +67,12 @@ typedef struct Branch_Unit
     int bz_last;
     int bp_last;
 
-    vector<int> btb;
-
+    //vector<int> btb;
+    vector<BT_Entry> btb;
     int branch_in_pipe_flag;
 
 } Branch_Unit;
+
 
 typedef struct IQ_Entry
 {
