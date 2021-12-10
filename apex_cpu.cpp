@@ -152,71 +152,22 @@ APEX_fetch(APEX_CPU *cpu)
                 cpu->fetch.vfu = INT_VFU;
                 break;
 
-
-            case OPCODE_JUMP:
-            case OPCODE_JALR:
-            case OPCODE_RET:
-
-              cpu->fetch.vfu = BRANCH_VFU;
-
-              int found;
-              for (auto it = cpu->branch_predictor.btb.begin(); it != cpu->branch_predictor.btb.end(); it++)
-              {
-
-                  if (cpu->fetch.pc == it->branch_pc)
-                  {
-                      found = TRUE;
-                      //then we can use branch_in_pipe_flag to see if we already have the target addr once
-                      //we go to decode1. then at decode1 we can flush things out, and set that result of the calculated address
-                      // as the current cpu pc, in the fetch stage.
-
-                      if (it->predict_pc != -1)
-                        cpu->branch_predictor.branch_in_pipe_flag = 1;
-
-                      break;
-                  }
-              }
-
-              if (!found){
-                BT_Entry temp;
-                temp.branch_pc = cpu->fetch.pc;
-                temp.addr = cpu->fetch.opcode;
-                temp.predict_pc = -1;
-                cpu->branch_predictor.btb.push_back(temp);
-
-              }
-
-
-              break;
-
-
             case OPCODE_BZ:
             case OPCODE_BNZ:
             case OPCODE_BP:
             case OPCODE_BNP:
+            case OPCODE_JUMP:
+            case OPCODE_JALR:
             case OPCODE_HALT:
                 cpu->fetch.vfu = BRANCH_VFU;
-
-
-
                 break;
 
         }
-
 
         cpu->fetch.rd = current_ins->rd;
         cpu->fetch.rs1 = current_ins->rs1;
         cpu->fetch.rs2 = current_ins->rs2;
         cpu->fetch.imm = current_ins->imm;
-
-
-
-
-
-
-
-
-
 
         /* Update PC for next instruction */
         cpu->pc += 4;
@@ -288,29 +239,6 @@ Stall if free list isn't empty
             return;
         } else{
 
-            if (cpu->branch_predictor.branch_in_pipe_flag == TRUE)
-            {
-              for (auto it = cpu->branch_predictor.btb.begin(); it != cpu->branch_predictor.btb.end(); it++ )
-              {
-                  int is_set =  FALSE;
-                  if (cpu->decode1.pc == it->branch_pc &&
-                    (it->predict_pc == -1)) {
-                  //    printf("WOW!  %d      %d\n", cpu->decode1.pc, it->predict_pc);
-
-                  //  cpu->decode2.pc = cpu->decode1.pc;
-                    it->predict_pc= cpu->decode1.pc+4;
-                    cpu->pc = it->predict_pc;
-                    cpu->decode2.pc = cpu->pc;
-              //      cpu->fetch_from_next_cycle = TRUE;
-                    cpu->branch_predictor.branch_in_pipe_flag = FALSE;
-                    return;
-                  }
-
-
-              }
-
-
-            }
             switch (cpu->decode1.opcode){//This switch is for checking LSQ & Free List -J
                 // Operations with a destination register need to be able to allocate a new physical register
                 case OPCODE_ADD:
@@ -361,6 +289,7 @@ Stall if free list isn't empty
             printf("Decode 1: %s\n", cpu->decode2.opcode_str);
         }
     }
+
 }
 
 static void
@@ -1072,8 +1001,7 @@ APEX_execute(APEX_CPU *cpu)
         }
 
         if (ENABLE_DEBUG_MESSAGES) {
-          //  printf("Execute Int: %d\n", cpu->int_exec.opcode);
-              printf("Execute Int:%s\n",cpu->int_exec.opcode_str);
+            printf("Execute Int: %d\n", cpu->int_exec.opcode);
         }
 
         if(mem_instruction){
@@ -1091,24 +1019,21 @@ APEX_execute(APEX_CPU *cpu)
             cpu->int_exec.has_insn = FALSE;
         }
 
-
-
-
     }
     /*
         Branch section
     */
+    printf("Outside if statement-(cpu->branch_exec.has_insn) : %d\n ", cpu->branch_exec.has_insn);
     if(cpu->branch_exec.has_insn){
+        printf("Inside branch_execution conditional\n");
         //Whoever does branch prediction will have to edit this portion significantly -J
             switch(cpu->branch_exec.opcode){
-            case OPCODE_BZ:
+              case OPCODE_BZ:
                 {
                     if (cpu->zero_flag == TRUE)
                     {
                         /* Calculate new PC, and send it to result buffer */
                         cpu->branch_exec.result_buffer = cpu->branch_exec.pc + cpu->branch_exec.imm;
-
-
 
                     }
                     break;
@@ -1148,13 +1073,11 @@ APEX_execute(APEX_CPU *cpu)
 
                 case OPCODE_JUMP:
                 {
+                        printf("Inside branch_exec.result_buffer");
                         /* Calculate new PC, and send it to result buffer */
                         cpu->branch_exec.result_buffer = cpu->branch_exec.rs1_value + cpu->branch_exec.imm;
-                        cpu->branch_predictor.branch_in_pipe_flag = FALSE;
-                      break;
-
-
-
+                        cpu->pc = cpu->branch_exec.result_buffer;
+                        break;
 
                 }
 
@@ -1164,16 +1087,15 @@ APEX_execute(APEX_CPU *cpu)
                     address (next instr under jalr) at the same time */
                       cpu->branch_exec.result_buffer = cpu->branch_exec.rs1_value + cpu->branch_exec.imm;
                       cpu->branch_exec.inc_address_buffer = cpu->branch_exec.memory_address + 4; //add 4 to obtain the NEXT INSTRUCTION ADDRESS -C
+                      break;
                 }
         }
-
 
         cpu->branch_wb = cpu->branch_exec;
         cpu->branch_exec.has_insn = FALSE;
 
         if (ENABLE_DEBUG_MESSAGES) {
-          //  printf("Execute Branch: %d\n", cpu->branch_wb.opcode);
-              printf("Execute Branch Unit:%s\n",cpu->branch_wb.opcode_str);
+            printf("Execute Branch: %d\n", cpu->branch_wb.opcode);
         }
 
     }
@@ -1235,8 +1157,7 @@ APEX_memory(APEX_CPU *cpu)
         }
 
         if (ENABLE_DEBUG_MESSAGES) {
-        //    printf("Memory: %d\n", cpu->memory.opcode);
-              printf("Memory:%d\n",cpu->memory.opcode_str);
+            printf("Memory: %d\n", cpu->memory.opcode);
         }
 
     }
@@ -1320,7 +1241,6 @@ APEX_forward(APEX_CPU* cpu, CPU_Stage forward){//This is where we'll forward the
             break;
 
         //ADD OTHER BRANCHES HERE -J
-        case OPCODE_NOP:
         case OPCODE_HALT:
             for(auto it = cpu->rob->begin(); it != cpu->rob->end(); it++){
                 if(forward.pc == it->pc_value){
@@ -1346,8 +1266,7 @@ APEX_writeback(APEX_CPU *cpu)
         cpu->mult_wb.has_insn = FALSE;
 
         if (ENABLE_DEBUG_MESSAGES) {
-        //    printf("Writeback MUL: %d\n", cpu->mult_wb.opcode);
-            printf("Writeback Mult:%s\n",cpu->mult_wb.opcode_str);
+            printf("Writeback MUL: %d\n", cpu->mult_wb.opcode);
         }
     }
     // Int operations writeback stage -H
@@ -1357,8 +1276,7 @@ APEX_writeback(APEX_CPU *cpu)
         cpu->int_wb.has_insn = FALSE;
 
         if (ENABLE_DEBUG_MESSAGES) {
-          //  printf("Writeback Int: %d\n", cpu->int_wb.opcode);
-          printf("Writeback Int:%s\n", cpu->int_wb.opcode_str);
+            printf("Writeback Int: %d\n", cpu->int_wb.opcode);
         }
     }
     if(cpu->mem_wb.has_insn){
@@ -1371,17 +1289,17 @@ APEX_writeback(APEX_CPU *cpu)
         cpu->mem_wb.has_insn = FALSE;
 
         if (ENABLE_DEBUG_MESSAGES) {
-          //  printf("Writeback Mem: %d\n", cpu->mem_wb.opcode);
-              printf("Writeback Mem:%s\n", cpu->mem_wb.opcode_str);
+            printf("Writeback Mem: %d\n", cpu->mem_wb.opcode);
         }
     }
     if(cpu->branch_wb.has_insn){
+        printf("branch_wb.has_insn before the forward: ?\n");
         APEX_forward(cpu, cpu->branch_wb);
+
         cpu->branch_wb.has_insn = FALSE;
         //This will have to be modified when BTB is added -J
         if(cpu->branch_wb.opcode == OPCODE_HALT){
             //No branching when a HALT is hit -J
-            cpu->fetch_from_next_cycle = FALSE;
         }else{
             switch(cpu->branch_exec.opcode){
                 case OPCODE_BZ:
@@ -1489,7 +1407,6 @@ APEX_writeback(APEX_CPU *cpu)
                     {
                             /* Calculate new PC, and send it to fetch unit */
                             cpu->branch_exec.pc = cpu->branch_wb.result_buffer;
-                            printf("branch result buffer:", cpu->branch_wb.result_buffer);
 
                             /* Since we are using reverse callbacks for pipeline stages,
                              * this will prevent the new instruction from being fetched in the current cycle*/
@@ -1503,6 +1420,10 @@ APEX_writeback(APEX_CPU *cpu)
                             cpu->branch_exec.has_insn = FALSE;
                             cpu->mult_wb.has_insn = FALSE;
                             cpu->int_wb.has_insn = FALSE;
+                            cpu->branch_wb.has_insn = FALSE;
+                            cpu->memory.has_insn = FALSE;
+                            cpu->mem_wb.has_insn = FALSE;
+                            cpu->commitment.has_insn =  FALSE;
                             /* Make sure fetch stage is enabled to start fetching from new PC */
                             cpu->fetch.has_insn = TRUE;
 
@@ -1549,14 +1470,13 @@ APEX_commitment(APEX_CPU* cpu){
                     printf("%d RESULT = %d\n", rob_entry.pc_value, rob_entry.result); // Useful for debugging results, so I'm leaving it in -J
                     break;
                 case OPCODE_HALT:
-                    printf("Commit halt\n");
                     return 1;
             }
 
             cpu->insn_completed++;
 
             if (ENABLE_DEBUG_MESSAGES) {
-                printf("Commit: %s\n ", cpu->commitment.opcode_str);
+                printf("Commit: ");
             }
         }
     }
@@ -1690,7 +1610,7 @@ APEX_cpu_run(APEX_CPU *cpu)
         if (ENABLE_DEBUG_MESSAGES)
         {
             printf("--------------------------------------------\n");
-            printf("Clock Cycle #: %d\n", cpu->clock);
+            printf("Clock Cycle #: %d \t PC #: %d\n", cpu->clock, cpu->pc);
             printf("--------------------------------------------\n");
         }
 
