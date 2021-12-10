@@ -172,6 +172,60 @@ APEX_fetch(APEX_CPU *cpu)
         /* Update PC for next instruction */
         cpu->pc += 4;
 
+
+        switch(cpu->fetch.opcode) //check the BTB
+        {
+
+
+            case OPCODE_BP:
+            case OPCODE_BZ:
+            case OPCODE_BNZ:
+            case OPCODE_BNP:
+            case OPCODE_JUMP:
+
+          // In fetch, we do a quick lookup in BTB to see if it is empty, or has a corresponding/matching entry.
+          //If it does, then we check to see if the target address has been calculated. If it has, then that value will be the new PC.
+          //btb, and if it is we can take advantage of this and, given that the current PC
+          //matches that of a BTB entry's PC, we can take the calculated
+
+          //      int taken;
+          cpu->branch_predictor.branch_in_pipe_flag = TRUE;
+          if (!(cpu->branch_predictor.btb.empty())){
+            for (auto it = cpu->branch_predictor.btb.begin(); it != cpu->branch_predictor.btb.end(); it++)
+            {
+              if ((current_ins->opcode == it->opcode) && (cpu->pc == it->branch_pc))
+              {
+
+                  cpu->decode1.has_insn = FALSE;
+                  cpu->decode2.has_insn = FALSE;
+                  cpu->branch_exec.has_insn = FALSE;
+                  cpu->int_exec.has_insn = FALSE;
+                  cpu->mult_exec.has_insn = FALSE;
+                  cpu->memory.has_insn = FALSE;
+
+                  cpu->int_wb.has_insn = FALSE;
+                  cpu->branch_wb.has_insn = FALSE;
+                  cpu->mult_wb.has_insn = FALSE;
+
+                  cpu->commitment.has_insn = FALSE;
+                  cpu->fetch_from_next_cycle = TRUE;
+                  cpu->fetch.has_insn = FALSE;
+                  //given that there are entries in the BTB and one that matches the current instruction,
+                  //then if the target pc is valid, we can set that calculated PC value to be the pc.
+                  if (it->target_pc != -1) {
+
+                      cpu->pc = it->branch_pc;
+
+                    //  taken=1;
+
+
+                  }
+                  break;
+                }
+              }
+            }
+        }
+
         /* Copy data from fetch latch to decode latch*/
         cpu->decode1 = cpu->fetch;
 
@@ -239,6 +293,8 @@ Stall if free list isn't empty
             return;
         } else{
 
+
+
             switch (cpu->decode1.opcode){//This switch is for checking LSQ & Free List -J
                 // Operations with a destination register need to be able to allocate a new physical register
                 case OPCODE_ADD:
@@ -276,6 +332,10 @@ Stall if free list isn't empty
             }
             //Do decode1 stuff, but check instruction types
             //cpu->fetch.has_insn = TRUE; //Might have to change this, not sure how this might interact with branches/HALTs -J
+
+
+
+
 
             // If we are waiting on a resource stall
             if (cpu->fetch.stall != TRUE) {
@@ -375,6 +435,37 @@ Rj <-- Rk <op> Rl
                 // BZ, BNZ, BP, and BNP don't have any source registers therefore require no action in the rename stage -H
             }
 
+  //  printf("Line 378 is where I start to clear the values for IQ, LSQ, ROB\n"); //Eventually, we'll have to add switch case here to clear for the other branches.
+        if (cpu->decode2.opcode == OPCODE_JUMP)
+        {
+
+            //clearing all the IQ_Entry entries out -C
+            for (int i = 0; i < 8; i++) {
+
+              {
+                IQ_Entry entry;
+                cpu->iq[i] = entry;
+
+
+              }
+            }
+
+            //clear the rob list.
+            cpu->rob->clear();
+            //clearing and resetting the lsq. -C
+            delete cpu->lsq;
+            cpu->lsq = new queue<IQ_Entry>;
+
+          //  char entry_index = index_IQ(cpu);
+            cpu->iq[0].status_bit = 1;
+            cpu->iq[0].fu_type = cpu->decode2.vfu;
+            cpu->iq[0].opcode = cpu->decode2.opcode;
+
+            //ADD THE INSTRUCTION BACK TO THE FRONT OF ROB AND IQ
+
+          }
+
+        else {
         //Filling out IQ entry -J
         char entry_index = index_IQ(cpu);
         cpu->iq[entry_index].status_bit = 1;
@@ -480,6 +571,7 @@ Rj <-- Rk <op> Rl
         }
 
     */
+  }
 
         cpu->decode2.has_insn = FALSE;
         //We don't forward data in pipeline to exec right away like before bc IQ is Out-of-Order -J
@@ -1023,9 +1115,9 @@ APEX_execute(APEX_CPU *cpu)
     /*
         Branch section
     */
-    printf("Outside if statement-(cpu->branch_exec.has_insn) : %d\n ", cpu->branch_exec.has_insn);
+    printf("Line 1118: (cpu->branch_exec.has_insn) : %d\n ", cpu->branch_exec.has_insn);
     if(cpu->branch_exec.has_insn){
-        printf("Inside branch_execution conditional\n");
+        printf("Line 1120: Inside branch_execution conditional\n");
         //Whoever does branch prediction will have to edit this portion significantly -J
             switch(cpu->branch_exec.opcode){
               case OPCODE_BZ:
@@ -1073,10 +1165,10 @@ APEX_execute(APEX_CPU *cpu)
 
                 case OPCODE_JUMP:
                 {
-                        printf("Inside branch_exec.result_buffer");
+                        printf("Line #1168: inside case OPCODE_JUMP\n");
                         /* Calculate new PC, and send it to result buffer */
                         cpu->branch_exec.result_buffer = cpu->branch_exec.rs1_value + cpu->branch_exec.imm;
-                        cpu->pc = cpu->branch_exec.result_buffer;
+                    //    cpu->pc = cpu->branch_exec.result_buffer;
                         break;
 
                 }
@@ -1089,6 +1181,9 @@ APEX_execute(APEX_CPU *cpu)
                       cpu->branch_exec.inc_address_buffer = cpu->branch_exec.memory_address + 4; //add 4 to obtain the NEXT INSTRUCTION ADDRESS -C
                       break;
                 }
+
+                case OPCODE_HALT:
+                  break;
         }
 
         cpu->branch_wb = cpu->branch_exec;
@@ -1293,7 +1388,7 @@ APEX_writeback(APEX_CPU *cpu)
         }
     }
     if(cpu->branch_wb.has_insn){
-        printf("branch_wb.has_insn before the forward: ?\n");
+        printf("Line 1391: inside cpu->branch_wb_has_insn\n");
         APEX_forward(cpu, cpu->branch_wb);
 
         cpu->branch_wb.has_insn = FALSE;
@@ -1567,7 +1662,6 @@ APEX_cpu_init(const char *filename)
     cpu->rob = new list<ROB_Entry>;
     cpu->lsq = new queue<IQ_Entry>;
 
-
     for(i = 0; i < 20; i++){//Setting up free list
 
         cpu->free_list->push(i);
@@ -1686,6 +1780,7 @@ APEX_cpu_stop(APEX_CPU *cpu)
     delete(cpu->free_list);
     delete(cpu->rob);
     delete(cpu->lsq);
+
     free(cpu->code_memory);
     //free(cpu->filename);
     free(cpu);

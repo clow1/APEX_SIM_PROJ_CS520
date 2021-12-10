@@ -51,9 +51,9 @@ typedef struct CPU_Stage
 //Branch table unit -C
 typedef struct BT_Entry     //will likely need more ENTRIES
 {
-  int addr;
+  int opcode;
   int branch_pc;
-  int predict_pc;
+  int target_pc; 
   int taken; //0 = not taken, 1 = taken
 }BT_Entry;
 
