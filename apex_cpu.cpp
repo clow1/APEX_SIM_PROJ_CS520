@@ -152,13 +152,60 @@ APEX_fetch(APEX_CPU *cpu)
                 cpu->fetch.vfu = INT_VFU;
                 break;
 
+            // Lookup branch instruction in BTB to determine if it's a hit or miss -H
             case OPCODE_BZ:
+                printf("Valid BTB Entry: %d\n", cpu->btb[0].valid);
+                cpu->fetch.vfu = BRANCH_VFU;
+                // If BTB entry is valid, it results in a HIT. Otherwise results in a MISS -H
+                if(cpu->btb[0].valid) {
+                    cpu->fetch.btb_miss = FALSE;
+                    // If HIT, set predicition based on btb lookup -H
+                    cpu->fetch.btb_prediciton = cpu->btb[0].outcome;
+                } else {
+                    cpu->fetch.btb_miss = TRUE;
+                }
+                break;
+
             case OPCODE_BNZ:
+                cpu->fetch.vfu = BRANCH_VFU;
+                // If BTB entry is valid, it results in a HIT. Otherwise results in a MISS -H
+                if(cpu->btb[1].valid) {
+                    cpu->fetch.btb_miss = FALSE;
+                    // If HIT, set predicition based on btb lookup -H
+                    cpu->fetch.btb_prediciton = cpu->btb[1].outcome;
+                } else {
+                    cpu->fetch.btb_miss = TRUE;
+                }
+                break;
+
             case OPCODE_BP:
+                cpu->fetch.vfu = BRANCH_VFU;
+                // If BTB entry is valid, it results in a HIT. Otherwise results in a MISS -H
+                if(cpu->btb[2].valid) {
+                    cpu->fetch.btb_miss = FALSE;
+                    // If HIT, set predicition based on btb lookup -H
+                    cpu->fetch.btb_prediciton = cpu->btb[2].outcome;
+                } else {
+                    cpu->fetch.btb_miss = TRUE;
+                }
+                break;
+
             case OPCODE_BNP:
+                cpu->fetch.vfu = BRANCH_VFU;
+                // If BTB entry is valid, it results in a HIT. Otherwise results in a MISS -H
+                if(cpu->btb[3].valid) {
+                    cpu->fetch.btb_miss = FALSE;
+                    // If HIT, set predicition based on btb lookup -H
+                    cpu->fetch.btb_prediciton = cpu->btb[3].outcome;
+                } else {
+                    cpu->fetch.btb_miss = TRUE;
+                }
+                break;
+
             case OPCODE_JUMP:
             case OPCODE_JALR:
             case OPCODE_HALT:
+                cpu->fetch.btb_miss = TRUE;
                 cpu->fetch.vfu = BRANCH_VFU;
                 break;
 
@@ -170,10 +217,18 @@ APEX_fetch(APEX_CPU *cpu)
         cpu->fetch.imm = current_ins->imm;
 
         /* Update PC for next instruction */
-        cpu->pc += 4;
+        // If BTB Hit and predicition is taken, then change PC value to imm -H
+        printf("Brnach Hit/Miss: %d\n", cpu->fetch.btb_miss);
+ 
+        if(cpu->fetch.btb_miss == FALSE && cpu->fetch.btb_prediciton == 1) {
+            cpu->pc = cpu->fetch.pc + cpu->fetch.imm;
+        } else {
+            printf("Hit miss\n");
+            cpu->pc += 4;
+        }
 
 
-        switch(cpu->fetch.opcode) //check the BTB
+        /*switch(cpu->fetch.opcode) //check the BTB
         {
 
 
@@ -224,7 +279,7 @@ APEX_fetch(APEX_CPU *cpu)
                 }
               }
             }
-        }
+        }*/
 
         /* Copy data from fetch latch to decode latch*/
         cpu->decode1 = cpu->fetch;
@@ -329,16 +384,56 @@ Stall if free list isn't empty
                         cpu->fetch.stall = TRUE;
                     }
                     break;
+
+                case OPCODE_BZ:
+                case OPCODE_BNZ:
+                case OPCODE_BP:
+                case OPCODE_BNP:
+                    // If btb miss, set default predicition of Taken -H
+                    if(cpu->decode1.btb_miss){
+                        cpu->decode1.btb_prediciton = 1;
+                    }
+                    break;
+
+                case OPCODE_JUMP:
+                case OPCODE_JALR:
+                case OPCODE_RET:
+                    // Default is always taken -H
+                    cpu->decode1.btb_prediciton = 1;
+                    break;
             }
-            //Do decode1 stuff, but check instruction types
-            //cpu->fetch.has_insn = TRUE; //Might have to change this, not sure how this might interact with branches/HALTs -J
-
-
-
 
 
             // If we are waiting on a resource stall
             if (cpu->fetch.stall != TRUE) {
+                // If BTB predicition is taken, change PC value -H
+                if (cpu->decode1.btb_prediciton == 1) {
+                    int pred_phys_reg_id = 0;
+                    switch (cpu->decode1.opcode) {
+                        case OPCODE_BZ:
+                        case OPCODE_BNZ:
+                        case OPCODE_BP:
+                        case OPCODE_BNP:
+                            cpu->pc = cpu->decode1.pc + cpu->decode1.imm;
+                            break;
+
+                        case OPCODE_JUMP:
+                        case OPCODE_JALR:
+                            pred_phys_reg_id = cpu->rename_table[cpu->decode1.rs1].phys_reg_id;
+                            cpu->pc = cpu->phys_regs[pred_phys_reg_id].value + cpu->decode1.imm;
+                            break;
+
+                        case OPCODE_RET:
+                            pred_phys_reg_id = cpu->rename_table[cpu->decode1.rs1].phys_reg_id;
+                            cpu->pc = cpu->phys_regs[cpu->decode1.rs1].value;
+                            break;
+                    }
+                    
+                    //Prevent new instruction from being fetched in current cycle -H
+                    cpu->fetch_from_next_cycle = TRUE;
+                    cpu->fetch.has_insn = TRUE;
+                }
+
                 cpu->decode2 = cpu->decode1;
                 cpu->decode1.has_insn = FALSE;
                 cpu->fetch.stall = FALSE;
@@ -436,7 +531,7 @@ Rj <-- Rk <op> Rl
             }
 
   //  printf("Line 378 is where I start to clear the values for IQ, LSQ, ROB\n"); //Eventually, we'll have to add switch case here to clear for the other branches.
-        if (cpu->decode2.opcode == OPCODE_JUMP)
+        /*if (cpu->decode2.opcode == OPCODE_JUMP)
         {
 
             //clearing all the IQ_Entry entries out -C
@@ -465,7 +560,7 @@ Rj <-- Rk <op> Rl
 
           }
 
-        else {
+        else {*/
         //Filling out IQ entry -J
         char entry_index = index_IQ(cpu);
         cpu->iq[entry_index].status_bit = 1;
@@ -543,11 +638,21 @@ Rj <-- Rk <op> Rl
 
 
         }
+        switch(cpu->decode2.opcode){//Branch Instructions -H
+            case OPCODE_JUMP:
+            case OPCODE_BP:
+            case OPCODE_BNP:
+            case OPCODE_JALR:
+            case OPCODE_BZ:
+            case OPCODE_BNZ:
+            case OPCODE_RET:
+                cpu->iq[entry_index].btb_prediciton = cpu->decode2.btb_prediciton;
+        }
+
         cpu->iq[entry_index].pc_value = cpu->decode2.pc;
 
         switch (cpu->decode2.opcode){//Adding to LSQ if it's a MEM instr -J
             case OPCODE_LOAD:
-            case OPCODE_RET:
             case OPCODE_STORE:
                 if(cpu->lsq->empty()){
                     cpu->iq[entry_index].lsq_id = 0;
@@ -557,21 +662,6 @@ Rj <-- Rk <op> Rl
                 cpu->lsq->push(cpu->iq[entry_index]);
                 break;
         }
-
-     /*
-        This was a bad addition, the status bit is already 1 and doesn't refer to the availability of the instruction to be issued
-      //Instantly set the status bit of instructions that only have literals
-        switch (cpu->decode2.opcode){
-            case OPCODE_MOVC:
-            case OPCODE_BP:
-            case OPCODE_BNP:
-            case OPCODE_BZ:
-            case OPCODE_BNZ:
-                cpu->iq[entry_index].status_bit = 1;
-        }
-
-    */
-  }
 
         cpu->decode2.has_insn = FALSE;
         //We don't forward data in pipeline to exec right away like before bc IQ is Out-of-Order -J
@@ -687,6 +777,7 @@ APEX_ISSUE_QUEUE(APEX_CPU *cpu){//Will handle grabbing the correct instructions 
                 case OPCODE_LOAD:
                 case OPCODE_JUMP:
                 case OPCODE_RET: //Added this since it has only src1 -C
+                case OPCODE_JALR:
                     if(cpu->phys_regs[cpu->iq[i].src1_tag].src_bit){
                         if(entry_index == 100){
                             entry_index = i;
@@ -794,8 +885,10 @@ APEX_ISSUE_QUEUE(APEX_CPU *cpu){//Will handle grabbing the correct instructions 
             case BRANCH_VFU:
                 cpu->branch_exec.pc = issuing_instr.pc_value;
                 cpu->branch_exec.opcode = issuing_instr.opcode;
+                cpu->branch_exec.btb_prediciton = issuing_instr.btb_prediciton;
                 cpu->branch_exec.has_insn = TRUE;
                 cpu->branch_exec.vfu = BRANCH_VFU;
+
                 switch(issuing_instr.opcode){
                     //Only literal -J
                     case OPCODE_BP:
@@ -816,7 +909,9 @@ APEX_ISSUE_QUEUE(APEX_CPU *cpu){//Will handle grabbing the correct instructions 
                         cpu->branch_exec.rs1_value = issuing_instr.src1_val;
                         break;
                     //JALR uses branch unit. -C
+                    //dest src1 literal
                     case OPCODE_JALR:
+                        printf("I got here!\n");
                         cpu->branch_exec.rs1 = issuing_instr.src1_tag;
                         cpu->branch_exec.rd = issuing_instr.dest;
                         cpu->branch_exec.imm = issuing_instr.literal;
@@ -838,7 +933,6 @@ APEX_ISSUE_QUEUE(APEX_CPU *cpu){//Will handle grabbing the correct instructions 
 static void
 APEX_execute(APEX_CPU *cpu)
 {
-
     //Grab instruction from issue queue
     APEX_ISSUE_QUEUE(cpu);
 
@@ -1122,66 +1216,265 @@ APEX_execute(APEX_CPU *cpu)
             switch(cpu->branch_exec.opcode){
               case OPCODE_BZ:
                 {
+                    // If zero flag is true, then branch should be taken. -H
                     if (cpu->zero_flag == TRUE)
                     {
-                        /* Calculate new PC, and send it to result buffer */
-                        cpu->branch_exec.result_buffer = cpu->branch_exec.pc + cpu->branch_exec.imm;
+                        /* Check predicition. If branch was already taken predicition was correct continue without any action. 
+                            Otherwise bad predicition, revert PC to the instruction PC+imm and flush all previous stages. -H
+                            0: Not Taken 1: Taken */
+                        if (cpu->branch_exec.btb_prediciton == 0) {
+                            // Set the new PC
+                            cpu->pc = cpu->branch_exec.pc + cpu->branch_exec.imm;
+
+                            /* Since we are using reverse callbacks for pipeline stages, 
+                            * this will prevent the new instruction from being fetched in the current cycle*/
+                            cpu->fetch_from_next_cycle = TRUE;
+
+                            // Flush all previous stages -H
+                            cpu->decode2.has_insn = FALSE;
+                            cpu->decode1.has_insn = FALSE;
+
+                            // Make sure fetch stage is enabled to start fetching from new PC -H
+                            cpu->fetch.has_insn = TRUE;
+
+                            // Set BTB predicition to 1 -H
+                            cpu->branch_exec.btb_prediciton = 1;
+
+                        }
+
+                    } else {
+                        // The brranch should not be taken
+
+                        /* Check predicition. If branch was not taken predicition was correct continue without any action. 
+                            Otherwise bad predicition, revert PC to PC+4 and flush all previous stages. -H */
+                        if (cpu->branch_exec.btb_prediciton == 1) {
+                            // Set the new PC
+                            cpu->pc = cpu->branch_exec.pc + 4;
+
+                            /* Since we are using reverse callbacks for pipeline stages, 
+                            * this will prevent the new instruction from being fetched in the current cycle*/
+                            cpu->fetch_from_next_cycle = TRUE;
+
+                            // Flush all previous stages -H
+                            cpu->decode2.has_insn = FALSE;
+                            cpu->decode1.has_insn = FALSE;
+
+                            // Make sure fetch stage is enabled to start fetching from new PC -H
+                            cpu->fetch.has_insn = TRUE;
+
+                            // Set BTB predicition to 0 -H
+                            cpu->branch_exec.btb_prediciton = 0;
+                        }
 
                     }
+
+                    // Set branch outcome in BTB for next predicition -H
+                    cpu->btb[0].valid = TRUE;
+                    cpu->btb[0].outcome = cpu->branch_exec.btb_prediciton;
+
                     break;
                 }
 
                 case OPCODE_BNZ:
                 {
 
+                    // If zero flag is false, then branch should be taken. -H
                     if (cpu->zero_flag == FALSE)
                     {
-                        /* Calculate new PC, and send it to result buffer */
-                        cpu->branch_exec.result_buffer = cpu->branch_exec.pc + cpu->branch_exec.imm;
+                        /* Check predicition. If branch was already taken predicition was correct continue without any action. 
+                            Otherwise bad predicition, revert PC to the instruction PC+imm and flush all previous stages. -H
+                            0: Not Taken 1: Taken */
+                        if (cpu->branch_exec.btb_prediciton == 0) {
+                            // Set the new PC
+                            cpu->pc = cpu->branch_exec.pc + cpu->branch_exec.imm;
+
+                            /* Since we are using reverse callbacks for pipeline stages, 
+                            * this will prevent the new instruction from being fetched in the current cycle*/
+                            cpu->fetch_from_next_cycle = TRUE;
+
+                            // Flush all previous stages -H
+                            cpu->decode2.has_insn = FALSE;
+                            cpu->decode1.has_insn = FALSE;
+
+                            // Make sure fetch stage is enabled to start fetching from new PC -H
+                            cpu->fetch.has_insn = TRUE;
+
+                            // Set BTB predicition to 1 -H
+                            cpu->branch_exec.btb_prediciton = 1;
+
+                        }
+
+                    } else {
+                        // The brranch should not be taken
+
+                        /* Check predicition. If branch was not taken predicition was correct continue without any action. 
+                            Otherwise bad predicition, revert PC to PC+4 and flush all previous stages. -H */
+                        if (cpu->branch_exec.btb_prediciton == 1) {
+                            // Set the new PC
+                            cpu->pc = cpu->branch_exec.pc + 4;
+
+                            /* Since we are using reverse callbacks for pipeline stages, 
+                            * this will prevent the new instruction from being fetched in the current cycle*/
+                            cpu->fetch_from_next_cycle = TRUE;
+
+                            // Flush all previous stages -H
+                            cpu->decode2.has_insn = FALSE;
+                            cpu->decode1.has_insn = FALSE;
+
+                            // Make sure fetch stage is enabled to start fetching from new PC -H
+                            cpu->fetch.has_insn = TRUE;
+
+                            // Set BTB predicition to 0 -H
+                            cpu->branch_exec.btb_prediciton = 0;
+                        }
 
                     }
+
+                    // Set branch outcome in BTB for next predicition -H
+                    cpu->btb[1].valid = TRUE;
+                    cpu->btb[1].outcome = cpu->branch_exec.btb_prediciton;
+
                     break;
                 }
 
                 case OPCODE_BP:
                 {
+                    // If positive flag is true, then branch should be taken. -H
                     if (cpu->positive_flag == TRUE)
                     {
-                        /* Calculate new PC, and send it to result buffer */
-                        cpu->branch_exec.result_buffer = cpu->branch_exec.pc + cpu->branch_exec.imm;
+                        /* Check predicition. If branch was already taken predicition was correct continue without any action. 
+                            Otherwise bad predicition, revert PC to the instruction PC+imm and flush all previous stages. -H
+                            0: Not Taken 1: Taken */
+                        if (cpu->branch_exec.btb_prediciton == 0) {
+                            // Set the new PC
+                            cpu->pc = cpu->branch_exec.pc + cpu->branch_exec.imm;
+
+                            /* Since we are using reverse callbacks for pipeline stages, 
+                            * this will prevent the new instruction from being fetched in the current cycle*/
+                            cpu->fetch_from_next_cycle = TRUE;
+
+                            // Flush all previous stages -H
+                            cpu->decode2.has_insn = FALSE;
+                            cpu->decode1.has_insn = FALSE;
+
+                            // Make sure fetch stage is enabled to start fetching from new PC -H
+                            cpu->fetch.has_insn = TRUE;
+
+                            // Set BTB predicition to 1 -H
+                            cpu->branch_exec.btb_prediciton = 1;
+
+                        }
+
+                    } else {
+                        // The brranch should not be taken
+
+                        /* Check predicition. If branch was not taken predicition was correct continue without any action. 
+                            Otherwise bad predicition, revert PC to PC+4 and flush all previous stages. -H */
+                        if (cpu->branch_exec.btb_prediciton == 1) {
+                            // Set the new PC
+                            cpu->pc = cpu->branch_exec.pc + 4;
+
+                            /* Since we are using reverse callbacks for pipeline stages, 
+                            * this will prevent the new instruction from being fetched in the current cycle*/
+                            cpu->fetch_from_next_cycle = TRUE;
+
+                            // Flush all previous stages -H
+                            cpu->decode2.has_insn = FALSE;
+                            cpu->decode1.has_insn = FALSE;
+
+                            // Make sure fetch stage is enabled to start fetching from new PC -H
+                            cpu->fetch.has_insn = TRUE;
+
+                            // Set BTB predicition to 0 -H
+                            cpu->branch_exec.btb_prediciton = 0;
+                        }
+
                     }
+
+                    // Set branch outcome in BTB for next predicition -H
+                    cpu->btb[2].valid = TRUE;
+                    cpu->btb[2].outcome = cpu->branch_exec.btb_prediciton;
+
                     break;
                 }
 
                 case OPCODE_BNP:
                 {
+                    // If positive flag is false, then branch should be taken. -H
                     if (cpu->positive_flag == FALSE)
                     {
-                        /* Calculate new PC, and send it to result buffer */
-                        cpu->branch_exec.result_buffer = cpu->branch_exec.pc + cpu->branch_exec.imm;
+                        /* Check predicition. If branch was already taken predicition was correct continue without any action. 
+                            Otherwise bad predicition, revert PC to the instruction PC+imm and flush all previous stages. -H
+                            0: Not Taken 1: Taken */
+                        if (cpu->branch_exec.btb_prediciton == 0) {
+                            // Set the new PC
+                            cpu->pc = cpu->branch_exec.pc + cpu->branch_exec.imm;
+
+                            /* Since we are using reverse callbacks for pipeline stages, 
+                            * this will prevent the new instruction from being fetched in the current cycle*/
+                            cpu->fetch_from_next_cycle = TRUE;
+
+                            // Flush all previous stages -H
+                            cpu->decode2.has_insn = FALSE;
+                            cpu->decode1.has_insn = FALSE;
+
+                            // Make sure fetch stage is enabled to start fetching from new PC -H
+                            cpu->fetch.has_insn = TRUE;
+
+                            // Set BTB predicition to 1 -H
+                            cpu->branch_exec.btb_prediciton = 1;
+
+                        }
+
+                    } else {
+                        // The brranch should not be taken
+
+                        /* Check predicition. If branch was not taken predicition was correct continue without any action. 
+                            Otherwise bad predicition, revert PC to PC+4 and flush all previous stages. -H */
+                        if (cpu->branch_exec.btb_prediciton == 1) {
+                            // Set the new PC
+                            cpu->pc = cpu->branch_exec.pc + 4;
+
+                            /* Since we are using reverse callbacks for pipeline stages, 
+                            * this will prevent the new instruction from being fetched in the current cycle*/
+                            cpu->fetch_from_next_cycle = TRUE;
+
+                            // Flush all previous stages -H
+                            cpu->decode2.has_insn = FALSE;
+                            cpu->decode1.has_insn = FALSE;
+
+                            // Make sure fetch stage is enabled to start fetching from new PC -H
+                            cpu->fetch.has_insn = TRUE;
+
+                            // Set BTB predicition to 0 -H
+                            cpu->branch_exec.btb_prediciton = 0;
+                        }
+
                     }
+
+                    // Set branch outcome in BTB for next predicition -H
+                    cpu->btb[3].valid = TRUE;
+                    cpu->btb[3].outcome = cpu->branch_exec.btb_prediciton;
+
                     break;
-                }
-
-                case OPCODE_JUMP:
-                {
-                        printf("Line #1168: inside case OPCODE_JUMP\n");
-                        /* Calculate new PC, and send it to result buffer */
-                        cpu->branch_exec.result_buffer = cpu->branch_exec.rs1_value + cpu->branch_exec.imm;
-                    //    cpu->pc = cpu->branch_exec.result_buffer;
-                        break;
-
                 }
 
                 case OPCODE_JALR:
                 {
+                    printf("Or I got here!\n");
+                    // JLAR is always taken, therefore it was taken in the decode 1 stage. However, we need to store the caclulated result in the destination register -H
+                    cpu->branch_exec.result_buffer = cpu->branch_exec.rs1_value + cpu->branch_exec.imm;
+
                     /*Calculate address by adding src1 and immediate and saves the return
                     address (next instr under jalr) at the same time */
-                      cpu->branch_exec.result_buffer = cpu->branch_exec.rs1_value + cpu->branch_exec.imm;
-                      cpu->branch_exec.inc_address_buffer = cpu->branch_exec.memory_address + 4; //add 4 to obtain the NEXT INSTRUCTION ADDRESS -C
+                      //cpu->branch_exec.result_buffer = cpu->branch_exec.rs1_value + cpu->branch_exec.imm;
+                      //cpu->branch_exec.inc_address_buffer = cpu->branch_exec.memory_address + 4; //add 4 to obtain the NEXT INSTRUCTION ADDRESS -C
                       break;
                 }
 
+                // JUMP/RET is always taken, therefore it was taken in the decode 1 stage and no action is required -H
+                case OPCODE_JUMP:
+                case OPCODE_RET:
                 case OPCODE_HALT:
                   break;
         }
@@ -1277,6 +1570,7 @@ APEX_forward(APEX_CPU* cpu, CPU_Stage forward){//This is where we'll forward the
         case OPCODE_OR:
         case OPCODE_EXOR:
         case OPCODE_MUL:
+        case OPCODE_JALR:
             //Loop through iq and match rd to rs1 or rs2 and fill in and set ready bit -J
             for(int i = 0; i < 8; i++){
                 if(cpu->iq[i].status_bit == 1){
@@ -1303,40 +1597,15 @@ APEX_forward(APEX_CPU* cpu, CPU_Stage forward){//This is where we'll forward the
             }
             break;
 
-        //Has to forward both src1 and dest. Same as LDI -C
-        case OPCODE_JALR:
-            for(int i = 0; i < 8; i++){
-                if(cpu->iq[i].status_bit == 1){
-                    if(cpu->iq[i].src1_tag == forward.rd){
-                        cpu->iq[i].src1_val = forward.result_buffer;
-                        cpu->iq[i].src1_rdy_bit = 1;
-                    }
-                    if(cpu->iq[i].src2_tag == forward.rd){
-                        cpu->iq[i].src2_val = forward.result_buffer;
-                        cpu->iq[i].src2_rdy_bit = 1;
-                    }
-                    if(cpu->iq[i].src1_tag == forward.rs1){
-                        cpu->iq[i].src1_val = forward.inc_address_buffer;
-                        cpu->iq[i].src1_rdy_bit = 1;
-                    }
-                    if(cpu->iq[i].src2_tag == forward.rs1){
-                        cpu->iq[i].src2_val = forward.inc_address_buffer;
-                        cpu->iq[i].src2_rdy_bit = 1;
-                    }
-
-                }
-            }
-
-            for(auto it = cpu->rob->begin(); it != cpu->rob->end(); it++){
-                if(forward.pc == it->pc_value){
-                    it->status_bit = 1;
-                    it->result = forward.result_buffer;
-                }
-            }
-            break;
-
         //ADD OTHER BRANCHES HERE -J
         case OPCODE_HALT:
+        case OPCODE_NOP:
+        case OPCODE_BZ:
+        case OPCODE_BNZ:
+        case OPCODE_BP:
+        case OPCODE_BNP:
+        case OPCODE_RET:
+        case OPCODE_JUMP:
             for(auto it = cpu->rob->begin(); it != cpu->rob->end(); it++){
                 if(forward.pc == it->pc_value){
                     it->status_bit = 1;
@@ -1391,145 +1660,27 @@ APEX_writeback(APEX_CPU *cpu)
         printf("Line 1391: inside cpu->branch_wb_has_insn\n");
         APEX_forward(cpu, cpu->branch_wb);
 
-        cpu->branch_wb.has_insn = FALSE;
+        
         //This will have to be modified when BTB is added -J
-        if(cpu->branch_wb.opcode == OPCODE_HALT){
+        // The only branch instruction that requires write back is JLAR -H
+        //if(cpu->branch_wb.opcode == OPCODE_HALT){
             //No branching when a HALT is hit -J
-        }else{
-            switch(cpu->branch_exec.opcode){
-                case OPCODE_BZ:
-                    {
-                        if (cpu->zero_flag == TRUE)
-                        {
-                            /* Calculate new PC, and send it to fetch unit */
-                            cpu->branch_wb.pc = cpu->branch_wb.result_buffer;
+        //}else{
+            switch(cpu->branch_wb.opcode){
 
-                            /* Since we are using reverse callbacks for pipeline stages,
-                             * this will prevent the new instruction from being fetched in the current cycle*/
-                            cpu->fetch_from_next_cycle = TRUE;
-
-                            /* Flush previous stages */
-                            cpu->decode2.has_insn = FALSE;
-                            cpu->decode1.has_insn = FALSE;
-                            cpu->mult_exec.has_insn = FALSE;
-                            cpu->int_exec.has_insn = FALSE;
-                            cpu->branch_exec.has_insn = FALSE;
-                            cpu->mult_wb.has_insn = FALSE;
-                            cpu->int_wb.has_insn = FALSE;
-                            /* Make sure fetch stage is enabled to start fetching from new PC */
-                            cpu->fetch.has_insn = TRUE;
-                        }
-                        break;
-                    }
-
-                    case OPCODE_BNZ:
-                    {
-
-                        if (cpu->zero_flag == FALSE)
-                        {
-                            /* Calculate new PC, and send it to fetch unit */
-                            cpu->branch_wb.pc = cpu->branch_wb.result_buffer;
-
-                            /* Since we are using reverse callbacks for pipeline stages,
-                             * this will prevent the new instruction from being fetched in the current cycle*/
-                            cpu->fetch_from_next_cycle = TRUE;
-
-                            /* Flush previous stages */
-                            cpu->decode2.has_insn = FALSE;
-                            cpu->decode1.has_insn = FALSE;
-                            cpu->mult_exec.has_insn = FALSE;
-                            cpu->int_exec.has_insn = FALSE;
-                            cpu->branch_exec.has_insn = FALSE;
-                            cpu->mult_wb.has_insn = FALSE;
-                            cpu->int_wb.has_insn = FALSE;
-                            /* Make sure fetch stage is enabled to start fetching from new PC */
-                            cpu->fetch.has_insn = TRUE;
-                        }
-                        break;
-                    }
-
-                    case OPCODE_BP:
-                    {
-                        if (cpu->positive_flag == TRUE)
-                        {
-                            /* Calculate new PC, and send it to fetch unit */
-                            cpu->branch_wb.pc = cpu->branch_wb.result_buffer;
-
-                            /* Since we are using reverse callbacks for pipeline stages,
-                             * this will prevent the new instruction from being fetched in the current cycle*/
-                            cpu->fetch_from_next_cycle = TRUE;
-
-                            /* Flush previous stages */
-                            cpu->decode2.has_insn = FALSE;
-                            cpu->decode1.has_insn = FALSE;
-                            cpu->mult_exec.has_insn = FALSE;
-                            cpu->int_exec.has_insn = FALSE;
-                            cpu->branch_exec.has_insn = FALSE;
-                            cpu->mult_wb.has_insn = FALSE;
-                            cpu->int_wb.has_insn = FALSE;
-                            /* Make sure fetch stage is enabled to start fetching from new PC */
-                            cpu->fetch.has_insn = TRUE;
-                        }
-                        break;
-                    }
-
-                    case OPCODE_BNP:
-                    {
-                        if (cpu->positive_flag == FALSE)
-                        {
-                            /* Calculate new PC, and send it to fetch unit */
-                            cpu->branch_wb.pc = cpu->branch_wb.result_buffer;
-
-                            /* Since we are using reverse callbacks for pipeline stages,
-                             * this will prevent the new instruction from being fetched in the current cycle*/
-                            cpu->fetch_from_next_cycle = TRUE;
-
-                            /* Flush previous stages */
-                            cpu->decode2.has_insn = FALSE;
-                            cpu->decode1.has_insn = FALSE;
-                            cpu->mult_exec.has_insn = FALSE;
-                            cpu->int_exec.has_insn = FALSE;
-                            cpu->branch_exec.has_insn = FALSE;
-                            cpu->mult_wb.has_insn = FALSE;
-                            cpu->int_wb.has_insn = FALSE;
-                            /* Make sure fetch stage is enabled to start fetching from new PC */
-                            cpu->fetch.has_insn = TRUE;
-                        }
-                        break;
-                    }
-
-                    case OPCODE_JUMP:
-                    {
-                            /* Calculate new PC, and send it to fetch unit */
-                            cpu->branch_exec.pc = cpu->branch_wb.result_buffer;
-
-                            /* Since we are using reverse callbacks for pipeline stages,
-                             * this will prevent the new instruction from being fetched in the current cycle*/
-                            cpu->fetch_from_next_cycle = TRUE;
-
-                            /* Flush previous stages */
-                            cpu->decode2.has_insn = FALSE;
-                            cpu->decode1.has_insn = FALSE;
-                            cpu->mult_exec.has_insn = FALSE;
-                            cpu->int_exec.has_insn = FALSE;
-                            cpu->branch_exec.has_insn = FALSE;
-                            cpu->mult_wb.has_insn = FALSE;
-                            cpu->int_wb.has_insn = FALSE;
-                            cpu->branch_wb.has_insn = FALSE;
-                            cpu->memory.has_insn = FALSE;
-                            cpu->mem_wb.has_insn = FALSE;
-                            cpu->commitment.has_insn =  FALSE;
-                            /* Make sure fetch stage is enabled to start fetching from new PC */
-                            cpu->fetch.has_insn = TRUE;
-
-                    }
+                case OPCODE_JALR:
+                    cpu->rename_table[CC_INDEX].phys_reg_id = cpu->branch_wb.rd;
+                    break;
             }
+
+            cpu->branch_wb.has_insn = FALSE;
+
             if (ENABLE_DEBUG_MESSAGES) {
                 printf("Writeback Branch: %d\n", cpu->branch_wb.opcode);
             }
 
 
-        }
+        //}
     }
 
     /* Default */
@@ -1555,6 +1706,7 @@ APEX_commitment(APEX_CPU* cpu){
                 case OPCODE_OR:
                 case OPCODE_EXOR:
                 case OPCODE_MUL:
+                case OPCODE_JALR:
                     /* For instructions with destination register: -H
                         - Write contents back into argitectural register
                         - Free up the physical register
@@ -1680,6 +1832,11 @@ APEX_cpu_init(const char *filename)
         cpu->iq[i] = iq_entry;
     }
     //Don't need to init LSQ or ROB bc they are both dynamically sized data structures -J
+
+    // Default all instructions in BTB to invalid -H
+    for (i = 0; i < 4; i++) {
+        cpu->btb[i].valid = FALSE;
+    }
 
     return cpu;
 }
