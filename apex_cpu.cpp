@@ -111,6 +111,73 @@ print_memory(const APEX_CPU *cpu)
 
 }
 
+static void
+print_iq(const APEX_CPU *cpu)
+{
+  printf("\n----------\n%s\n----------\n", "IQ:");
+  for (int i = 0; i < 6; i++)
+  {
+
+
+
+      printf("ENTRY %d || ", i);
+
+      printf("%d,", cpu->iq[i].status_bit);
+      if (cpu->iq[i].literal == INVALID ||
+        cpu->iq[i].literal == 32767) printf("XX,");
+      else {printf("%d,",cpu->iq[i].literal);}
+
+      if (cpu->iq[i].src1_rdy_bit == INVALID ||
+        cpu->iq[i].src1_rdy_bit == -1) printf("XX,");
+      else{printf("%d,",cpu->iq[i].src1_rdy_bit);}
+
+      if(cpu->iq[i].src1_tag == INVALID ||
+        (cpu->iq[i].src1_tag == -1)) printf("XX,");
+      else{printf("%d,",cpu->iq[i].src1_tag);}
+
+      if(cpu->iq[i].src1_val == INVALID ||
+        cpu->iq[i].src1_val == -1) printf("XX,");
+      else{printf("%d,",cpu->iq[i].src1_val);}
+
+      if(cpu->iq[i].src2_rdy_bit == INVALID ||
+        cpu->iq[i].src2_rdy_bit == -1) printf("XX,");
+      else{printf("%d,",cpu->iq[i].src2_rdy_bit);}
+
+      if(cpu->iq[i].src2_tag == INVALID ||
+        cpu->iq[i].src2_tag == -1) printf("XX,");
+      else{printf("%d,", cpu->iq[i].src2_tag);}
+
+      if(cpu->iq[i].src2_val == INVALID ||
+        cpu->iq[i].src2_val == -1) printf("XX,");
+      else{printf("%d,",cpu->iq[i].src2_val);}
+
+      if(cpu->iq[i].lsq_id == INVALID ||
+        cpu->iq[i].lsq_id == -1) printf("XX");
+      else{printf("%d",cpu->iq[i].lsq_id);}
+
+
+
+    if (i < 5) {
+      printf(",\n");
+    }
+  }
+  printf("\n");
+}
+
+static void
+print_rob(const APEX_CPU *cpu)
+{
+  int i = 0;
+  printf("\n----------\n%s\n----------\n", "ROB:");
+    for (auto it = cpu->rob->begin(); it != cpu->rob->end(); it++)
+    {
+
+      printf("Entry %d || %d %d %d %d %d %d \n", i, it->pc_value, it->ar_addr, it->result,
+      it->opcode, it->status_bit, it->itype);
+      ++i;
+    }
+}
+
 /*
  * Fetch Stage of APEX Pipeline
  *
@@ -125,7 +192,6 @@ APEX_fetch(APEX_CPU *cpu)
 
     if (cpu->fetch.has_insn && !cpu->fetch.stall)
     {
-
         /* This fetches new branch target instruction from next cycle */
         if (cpu->fetch_from_next_cycle == TRUE)
         {
@@ -1754,6 +1820,8 @@ APEX_cpu_run(APEX_CPU *cpu)
             }
         }
 
+
+
         APEX_command(cpu,cpu->command);
         cpu->clock++;
     }
@@ -1814,15 +1882,40 @@ APEX_command(APEX_CPU *cpu, std::string  user_in)
 
 
     if (tok.size() == 1) {
-      if (user_in.compare("SHOWREGS") == TRUE){
+      std::string s1 = tok.at(0);
+      if (s1 == ("SHOWREGS")){
         print_reg_file(cpu);
         print_phys_reg_file(cpu);
       }
-      else if (user_in.compare("SHOWRNT") == TRUE) {
+      else if (s1 == ("SHOWRNT")) {
         print_rename_table(cpu);
       }
+      else if (s1 == "SHOWIQ") {
+        print_iq(cpu);
+      }
+      else if (s1 == "SHOWROB"){
+        print_rob(cpu);
+      }
+      else if(s1 == "STARTOVER") {
 
+      //  cpu->pc = 4000;
+      //  cpu->clock = 1;
+        //WE NEED TO FLUSH THE PIPELINE
+      }
 
     }
+    if (tok.size() == 2) {
+        std::string s1 = tok.at(0);
+      if (s1== "Carriage" && tok.at(1) == "run") {
+
+            cpu->single_step = TRUE;
+      }
+
+      if (s1 == "RUN")
+        if (cpu->clock == stoi(tok.at(1))) {
+            exit(0);
+        }
+    }
+
 
 }
