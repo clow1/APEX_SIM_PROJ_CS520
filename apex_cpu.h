@@ -144,6 +144,7 @@ typedef struct APEX_CPU
     APEX_Instruction *code_memory; /* Code Memory */
     int data_memory[DATA_MEMORY_SIZE]; /* Data Memory */
     int single_step;               /* Wait for user input after every cycle */
+    int set_cycle_max;
     int zero_flag;                 /* {TRUE, FALSE} Used by BZ and BNZ to branch */
     int positive_flag;
     int fetch_from_next_cycle;
