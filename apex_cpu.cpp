@@ -189,7 +189,6 @@ APEX_fetch(APEX_CPU *cpu)
 
     //I think fetch can go completely unchanged - J
     APEX_Instruction *current_ins;
-
     if (cpu->fetch.has_insn && !cpu->fetch.stall)
     {
         /* This fetches new branch target instruction from next cycle */
@@ -383,7 +382,7 @@ static char available_ROB(APEX_CPU* cpu){
 
 static char available_IQ(APEX_CPU* cpu){
     for(int i = 0; i < 8; i++){
-        if(cpu->iq[i].status_bit == VALID){
+        if(cpu->iq[i].status_bit == 0){
             return TRUE;
         }
     }
@@ -392,7 +391,7 @@ static char available_IQ(APEX_CPU* cpu){
 
 static char index_IQ(APEX_CPU* cpu){//Finds the first valid index to write into -J
     for(char i = 0; i < 8; i++){
-        if(cpu->iq[i].status_bit == VALID){
+        if(cpu->iq[i].status_bit == 0){
             return i;
         }
     }
@@ -425,7 +424,7 @@ Stall if free list isn't empty
             return;
         } else{
 
-
+            cpu->fetch.stall = FALSE; //Set it back if it was set in previous check -J
 
             switch (cpu->decode1.opcode){//This switch is for checking LSQ & Free List -J
                 // Operations with a destination register need to be able to allocate a new physical register
@@ -441,6 +440,7 @@ Stall if free list isn't empty
                     //Free List check -J
                    if(cpu->free_list->empty()){
                         cpu->fetch.stall = TRUE;
+
                     }
                     break;
 
@@ -502,7 +502,7 @@ Stall if free list isn't empty
 
                         case OPCODE_RET:
                             pred_phys_reg_id = cpu->rename_table[cpu->decode1.rs1].phys_reg_id;
-                            cpu->pc = cpu->phys_regs[cpu->decode1.rs1].value;
+                            cpu->pc = cpu->phys_regs[pred_phys_reg_id].value;
                             break;
                     }
                     
@@ -796,7 +796,6 @@ static int tiebreaker_IQ(APEX_CPU* cpu, int a, int b){//The lower PC value is th
 
 static int
 free_VFU(APEX_CPU* cpu, int fu_type){
-
     switch(fu_type){//Checking VFUs -J
         //Check MUL VFU -J
         case MUL_VFU:
@@ -826,7 +825,7 @@ APEX_ISSUE_QUEUE(APEX_CPU *cpu){//Will handle grabbing the correct instructions 
 
     int entry_index = 100;
     for(int i = 0; i < 8; i++){
-        if(cpu->iq[i].status_bit == INVALID && free_VFU(cpu, cpu->iq[i].fu_type)){//Now check and see if the src_bits are valid (but diff instr wait on diff srcs) -J
+        if(cpu->iq[i].status_bit == 1 && free_VFU(cpu, cpu->iq[i].fu_type)){//Now check and see if the src_bits are valid (but diff instr wait on diff srcs) -J
             switch(cpu->iq[i].opcode){
                 //First look at instr w/ src1 & src2
                 case OPCODE_ADD:
@@ -1017,7 +1016,7 @@ APEX_execute(APEX_CPU *cpu)
         Multiplication section
     */
     if(cpu->mult_exec.has_insn){
-        if(cpu->mult_exec.stage_delay < 4){
+        if(cpu->mult_exec.stage_delay > 4){
             switch (cpu->mult_exec.opcode){
                 case OPCODE_MUL:
                 {
