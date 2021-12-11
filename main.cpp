@@ -29,9 +29,9 @@ main(int argc, char const *argv[])
     getline(std::cin, user_input);
 
 
-    cpu = APEX_cpu_init(argv[1]);
+  cpu = APEX_cpu_init(argv[1]);
    APEX_command(cpu, user_input);
-
+   
     if (!cpu)
     {
         fprintf(stderr, "APEX_Error: Unable to initialize CPU\n");

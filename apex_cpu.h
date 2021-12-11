@@ -174,6 +174,7 @@ typedef struct APEX_CPU
                           structure as an IQ entry.
                           use queue because in order*/
 
+    std::string command;
 
 } APEX_CPU;
 

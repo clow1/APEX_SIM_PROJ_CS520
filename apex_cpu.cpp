@@ -39,14 +39,24 @@ print_reg_file(const APEX_CPU *cpu)
 
     for (int i = 0; i < REG_FILE_SIZE / 2; ++i)
     {
-        printf("R%-3d[%-3d] ", i, cpu->arch_regs[i]);
+
+      if (cpu->arch_regs[i].value == 0) {
+        printf("R%-3d[X] ",i);
+      } else {
+            printf("R%-3d[%-3d] ", i, cpu->arch_regs[i]);
+      }
+
     }
 
     printf("\n");
 
     for (int i = (REG_FILE_SIZE / 2); i < REG_FILE_SIZE; ++i)
     {
-        printf("R%-3d[%-3d] ", i, cpu->arch_regs[i]);
+      if (cpu->arch_regs[i].value == 0) {
+        printf("R%-3d[X] ",i);
+      } else {
+            printf("R%-3d[%-3d] ", i, cpu->arch_regs[i]);
+      }
     }
 
     printf("\n");
@@ -1726,9 +1736,9 @@ APEX_cpu_run(APEX_CPU *cpu)
         APEX_decode2(cpu);
         APEX_decode1(cpu);
         APEX_fetch(cpu);
-        print_reg_file(cpu);
+      /*  print_reg_file(cpu);
         print_phys_reg_file(cpu);
-        print_rename_table(cpu);
+        print_rename_table(cpu);*/
       //  print_memory(cpu);
         printf("\n\n\n\n");
 
@@ -1744,6 +1754,7 @@ APEX_cpu_run(APEX_CPU *cpu)
             }
         }
 
+        APEX_command(cpu,cpu->command);
         cpu->clock++;
     }
     //Do display stuff
@@ -1790,17 +1801,28 @@ APEX_cpu_stop(APEX_CPU *cpu)
 void
 APEX_command(APEX_CPU *cpu, std::string  user_in)
 {
-  std::cout<<user_in<<std::endl;
 
   std::vector<std::string> tok;
   std::stringstream ss(user_in);
   std::string buffer;
-
+  cpu->command = user_in;
 
 
     while (ss >> buffer){
       tok.push_back(buffer);
     }
-    std::cout<<tok.size()<<std::endl;
+
+
+    if (tok.size() == 1) {
+      if (user_in.compare("SHOWREGS") == TRUE){
+        print_reg_file(cpu);
+        print_phys_reg_file(cpu);
+      }
+      else if (user_in.compare("SHOWRNT") == TRUE) {
+        print_rename_table(cpu);
+      }
+
+
+    }
 
 }
