@@ -237,6 +237,7 @@ create_APEX_instruction(APEX_Instruction *ins, char *buffer)
         case OPCODE_LOAD:
         case OPCODE_ADDL:
         case OPCODE_SUBL:
+        case OPCODE_JALR:
         {
             ins->rd = get_num_from_string(tokens[0]);
             ins->rs1 = get_num_from_string(tokens[1]);
@@ -272,16 +273,10 @@ create_APEX_instruction(APEX_Instruction *ins, char *buffer)
             break;
         }
 
-        case OPCODE_JALR:
-        {
-            ins->rd = get_num_from_string(tokens[0]);
-            ins->rs1 = get_num_from_string(tokens[1]);
-            ins-> imm = get_num_from_string(tokens[2]); //A SIGNED immediate. -C
-        }
-
         case OPCODE_RET:
         {
             ins->rs1 = get_num_from_string(tokens[0]); //unconditionally returns to the address in rs1 -C
+            break;
         }
 
     }
