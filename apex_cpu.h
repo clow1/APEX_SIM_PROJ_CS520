@@ -47,11 +47,17 @@ typedef struct CPU_Stage
     int stage_delay; //Counter to delay MUL by four cycles -J
     int vfu; //Just to lessen the amount of switch statements -J
     int stall; //Make it easier to explicitly stall instructions waiting for ROB/IQ/LSQ -J
+    int btb_miss; // This flag will only be set when a BTB miss occurs -H
+    int btb_prediciton; // This will store the predicition to take / NOT take branch -H
 } CPU_Stage;
 
-//Branch table unit -C
-typedef struct BT_Entry     //will likely need more ENTRIES
+typedef struct BTB_Entry
 {
+    int valid; // If valid: BTB Hit, otherwise BTB Miss -H
+    int outcome; // Based on previous branch outcome 0: Not Taken 1: Taken -H
+} BTB_Entry;
+
+/*typedef struct BT_Entry
   int opcode;
   int branch_pc;
   int target_pc;
@@ -61,7 +67,7 @@ typedef struct BT_Entry     //will likely need more ENTRIES
 /*branch predicution unit struct*/
 
 //the new branches = explicitly taken each time
-typedef struct Branch_Unit
+/*typedef struct Branch_Unit
 {
     int bnz_last;
     int bnp_last;
@@ -72,7 +78,7 @@ typedef struct Branch_Unit
     vector<BT_Entry> btb;
     int branch_in_pipe_flag;
 
-} Branch_Unit;
+} Branch_Unit;*/
 
 
 typedef struct IQ_Entry
@@ -94,6 +100,8 @@ typedef struct IQ_Entry
   int lsq_id;
 
   int pc_value; //For tiebreaking -J
+  // We need the prediction in the exe stage for branches -H
+  int btb_prediciton; // This will store the predicition to take / NOT take branch -H
 }IQ_Entry;
 
 
@@ -156,7 +164,14 @@ typedef struct APEX_CPU
     CPU_Stage branch_wb;
     CPU_Stage mem_wb; //LOAD, LDI, and STI share a single cycle WB stage -J
 
-    Branch_Unit branch_predictor;
+    /* Assume the following -H
+        - btb[0] - BN
+        - btb[1] - BNZ
+        - btb[2] - BP
+        - btb[3] - BNP
+    */
+    BTB_Entry btb[4]; // There are 4 types of branch instructions -H
+
     Rename_Entry rename_table[REG_FILE_SIZE+1];  /*last element in CC is the
                                         most recently allocated phys. reg*/
 
