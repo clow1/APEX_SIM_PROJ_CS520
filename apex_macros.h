@@ -67,4 +67,9 @@
 #define NOT_READY 0
 #define READY 1
 
+/* ITYPES */
+#define MEMORY_ITYPE 0
+#define ARITHMETIC_ITYPE 1
+#define CONTROL_FLOW_ITYPE 2
+
 #endif

@@ -180,10 +180,46 @@ print_rob(const APEX_CPU *cpu)
   printf("\n----------\n%s\n----------\n", "ROB:");
     for (auto it = cpu->rob->begin(); it != cpu->rob->end(); it++)
     {
+      printf("ENTRY %d ||", i);
+      if (it->pc_value < 4000) {
+        printf("XX, ");
+      } else printf("%d, ", it->pc_value);
 
-      printf("Entry %d || %d %d %d %d %d %d \n", i, it->pc_value, it->ar_addr, it->result,
-      it->opcode, it->status_bit, it->itype);
+      if ((it->ar_addr)> 16)
+      {
+        printf("XX, ");
+      } else printf("%d, ", it->ar_addr);
+
+      //REG-REG RESULT
+      switch(it->opcode) {
+        case OPCODE_ADDL:
+        case OPCODE_ADD:
+        case OPCODE_SUB:
+        case OPCODE_STORE:
+        case OPCODE_SUBL:
+        case OPCODE_LOAD:
+        case OPCODE_MOVC:
+        case OPCODE_MUL:
+        case OPCODE_DIV:
+            if (it->status_bit == VALID)
+            printf("%d, ", it->result);
+            else printf("XX, ");
+            break;
+        default:
+          printf("XX, ");
+          break;
+      }
+
+      if (it->status_bit == NOT_READY) printf("XX, ");
+      else printf("%d, ", it->status_bit);
+
+      if (it->itype == INVALID) {
+        printf("XX, ");
+      } else printf("%d ", it->itype);
+
       ++i;
+
+      printf("\n");
     }
 }
 
