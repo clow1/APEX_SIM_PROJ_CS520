@@ -1473,7 +1473,7 @@ APEX_execute(APEX_CPU *cpu)
                 case OPCODE_JALR:
                 {
                     printf("Or I got here!\n");
-                    // JLAR is always taken, therefore it was taken in the decode 1 stage. However, we need to store the caclulated result in the destination register -H
+                    // JALR is always taken, therefore it was taken in the decode 1 stage. However, we need to store the caclulated result in the destination register -H
                     cpu->branch_exec.result_buffer = cpu->branch_exec.rs1_value + cpu->branch_exec.imm;
 
                     /*Calculate address by adding src1 and immediate and saves the return
