@@ -27,11 +27,15 @@ main(int argc, char const *argv[])
 
     std::cout <<"Enter a command: " << std::endl;
     getline(std::cin, user_input);
+    if (user_input == "")
+    {
+        printf("HUH");
+        user_input = " ";
+    }
 
-
-  cpu = APEX_cpu_init(argv[1]);
+    cpu = APEX_cpu_init(argv[1]);
    APEX_command(cpu, user_input);
-   
+
     if (!cpu)
     {
         fprintf(stderr, "APEX_Error: Unable to initialize CPU\n");

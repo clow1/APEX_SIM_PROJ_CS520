@@ -121,46 +121,55 @@ print_iq(const APEX_CPU *cpu)
 
 
       printf("ENTRY %d || ", i);
+        if (cpu->iq[i].status_bit == INVALID) {
+          printf("XX, ");
+        } else printf("%d, ", cpu->iq[i].status_bit);
 
-      printf("%d,", cpu->iq[i].status_bit);
-      if (cpu->iq[i].literal == INVALID ||
-        cpu->iq[i].literal == 32767) printf("XX,");
-      else {printf("%d,",cpu->iq[i].literal);}
+        if  (cpu->iq[i].status_bit == INVALID || cpu->iq[i].status_bit < 0 ||
+          cpu->iq[i].status_bit > 3)
+        {
+          printf("XX, ");
+        } else printf("%d, ", cpu->iq[i].fu_type);
 
-      if (cpu->iq[i].src1_rdy_bit == INVALID ||
-        cpu->iq[i].src1_rdy_bit == -1) printf("XX,");
-      else{printf("%d,",cpu->iq[i].src1_rdy_bit);}
+        if (cpu->iq[i].src1_rdy_bit == NOT_READY)
+        {
+          printf("XX, ");
+        } else printf("%d, ", cpu->iq[i].src1_rdy_bit);
 
-      if(cpu->iq[i].src1_tag == INVALID ||
-        (cpu->iq[i].src1_tag == -1)) printf("XX,");
-      else{printf("%d,",cpu->iq[i].src1_tag);}
+        if (cpu->iq[i].src1_tag == INVALID ||
+          cpu->iq[i].src1_tag < 0)
+        {
+          printf("XX, ");
+        }else printf("%d, ", cpu->iq[i].src1_tag);
 
-      if(cpu->iq[i].src1_val == INVALID ||
-        cpu->iq[i].src1_val == -1) printf("XX,");
-      else{printf("%d,",cpu->iq[i].src1_val);}
+        if (cpu->iq[i].src1_rdy_bit == NOT_READY ||
+          cpu->iq[i].src1_rdy_bit < 0)
+        {
+          printf("XX, ");
+        } else printf("%d, ", cpu->iq[i].src1_val);
 
-      if(cpu->iq[i].src2_rdy_bit == INVALID ||
-        cpu->iq[i].src2_rdy_bit == -1) printf("XX,");
-      else{printf("%d,",cpu->iq[i].src2_rdy_bit);}
+        if (cpu->iq[i].src2_rdy_bit == NOT_READY ||
+          cpu->iq[i].src2_rdy_bit < 0)
+        {
+          printf("XX, ");
+        } else printf("%d, ", cpu->iq[i].src2_rdy_bit);
 
-      if(cpu->iq[i].src2_tag == INVALID ||
-        cpu->iq[i].src2_tag == -1) printf("XX,");
-      else{printf("%d,", cpu->iq[i].src2_tag);}
+        if (cpu->iq[i].src2_tag == INVALID ||
+          cpu->iq[i].src2_tag < 0) {
+          printf("XX, ");
+        } else printf("%d, ", cpu->iq[i].src2_tag);
 
-      if(cpu->iq[i].src2_val == INVALID ||
-        cpu->iq[i].src2_val == -1) printf("XX,");
-      else{printf("%d,",cpu->iq[i].src2_val);}
+        if (cpu->iq[i].src2_rdy_bit == NOT_READY ||
+          cpu->iq[i].src2_rdy_bit < 0) {
+          printf("XX, ");
+        } else printf("%d, ", cpu->iq[i].src2_val);
 
-      if(cpu->iq[i].lsq_id == INVALID ||
-        cpu->iq[i].lsq_id == -1) printf("XX");
-      else{printf("%d",cpu->iq[i].lsq_id);}
-
-
-
-    if (i < 5) {
-      printf(",\n");
+        if (cpu->iq[i].dest == INVALID) {
+          printf("XX ");
+        } else printf("%d ", cpu->iq[i].dest);
+        printf("\n");
     }
-  }
+
   printf("\n");
 }
 
@@ -295,7 +304,7 @@ APEX_fetch(APEX_CPU *cpu)
         /* Update PC for next instruction */
         // If BTB Hit and predicition is taken, then change PC value to imm -H
         printf("Brnach Hit/Miss: %d\n", cpu->fetch.btb_miss);
- 
+
         if(cpu->fetch.btb_miss == FALSE && cpu->fetch.btb_prediciton == 1) {
             cpu->pc = cpu->fetch.pc + cpu->fetch.imm;
         } else {
@@ -505,7 +514,7 @@ Stall if free list isn't empty
                             cpu->pc = cpu->phys_regs[pred_phys_reg_id].value;
                             break;
                     }
-                    
+
                     //Prevent new instruction from being fetched in current cycle -H
                     cpu->fetch_from_next_cycle = TRUE;
                     cpu->fetch.has_insn = TRUE;
@@ -1295,14 +1304,14 @@ APEX_execute(APEX_CPU *cpu)
                     // If zero flag is true, then branch should be taken. -H
                     if (cpu->zero_flag == TRUE)
                     {
-                        /* Check predicition. If branch was already taken predicition was correct continue without any action. 
+                        /* Check predicition. If branch was already taken predicition was correct continue without any action.
                             Otherwise bad predicition, revert PC to the instruction PC+imm and flush all previous stages. -H
                             0: Not Taken 1: Taken */
                         if (cpu->branch_exec.btb_prediciton == 0) {
                             // Set the new PC
                             cpu->pc = cpu->branch_exec.pc + cpu->branch_exec.imm;
 
-                            /* Since we are using reverse callbacks for pipeline stages, 
+                            /* Since we are using reverse callbacks for pipeline stages,
                             * this will prevent the new instruction from being fetched in the current cycle*/
                             cpu->fetch_from_next_cycle = TRUE;
 
@@ -1321,13 +1330,13 @@ APEX_execute(APEX_CPU *cpu)
                     } else {
                         // The brranch should not be taken
 
-                        /* Check predicition. If branch was not taken predicition was correct continue without any action. 
+                        /* Check predicition. If branch was not taken predicition was correct continue without any action.
                             Otherwise bad predicition, revert PC to PC+4 and flush all previous stages. -H */
                         if (cpu->branch_exec.btb_prediciton == 1) {
                             // Set the new PC
                             cpu->pc = cpu->branch_exec.pc + 4;
 
-                            /* Since we are using reverse callbacks for pipeline stages, 
+                            /* Since we are using reverse callbacks for pipeline stages,
                             * this will prevent the new instruction from being fetched in the current cycle*/
                             cpu->fetch_from_next_cycle = TRUE;
 
@@ -1357,14 +1366,14 @@ APEX_execute(APEX_CPU *cpu)
                     // If zero flag is false, then branch should be taken. -H
                     if (cpu->zero_flag == FALSE)
                     {
-                        /* Check predicition. If branch was already taken predicition was correct continue without any action. 
+                        /* Check predicition. If branch was already taken predicition was correct continue without any action.
                             Otherwise bad predicition, revert PC to the instruction PC+imm and flush all previous stages. -H
                             0: Not Taken 1: Taken */
                         if (cpu->branch_exec.btb_prediciton == 0) {
                             // Set the new PC
                             cpu->pc = cpu->branch_exec.pc + cpu->branch_exec.imm;
 
-                            /* Since we are using reverse callbacks for pipeline stages, 
+                            /* Since we are using reverse callbacks for pipeline stages,
                             * this will prevent the new instruction from being fetched in the current cycle*/
                             cpu->fetch_from_next_cycle = TRUE;
 
@@ -1383,13 +1392,13 @@ APEX_execute(APEX_CPU *cpu)
                     } else {
                         // The brranch should not be taken
 
-                        /* Check predicition. If branch was not taken predicition was correct continue without any action. 
+                        /* Check predicition. If branch was not taken predicition was correct continue without any action.
                             Otherwise bad predicition, revert PC to PC+4 and flush all previous stages. -H */
                         if (cpu->branch_exec.btb_prediciton == 1) {
                             // Set the new PC
                             cpu->pc = cpu->branch_exec.pc + 4;
 
-                            /* Since we are using reverse callbacks for pipeline stages, 
+                            /* Since we are using reverse callbacks for pipeline stages,
                             * this will prevent the new instruction from being fetched in the current cycle*/
                             cpu->fetch_from_next_cycle = TRUE;
 
@@ -1418,14 +1427,14 @@ APEX_execute(APEX_CPU *cpu)
                     // If positive flag is true, then branch should be taken. -H
                     if (cpu->positive_flag == TRUE)
                     {
-                        /* Check predicition. If branch was already taken predicition was correct continue without any action. 
+                        /* Check predicition. If branch was already taken predicition was correct continue without any action.
                             Otherwise bad predicition, revert PC to the instruction PC+imm and flush all previous stages. -H
                             0: Not Taken 1: Taken */
                         if (cpu->branch_exec.btb_prediciton == 0) {
                             // Set the new PC
                             cpu->pc = cpu->branch_exec.pc + cpu->branch_exec.imm;
 
-                            /* Since we are using reverse callbacks for pipeline stages, 
+                            /* Since we are using reverse callbacks for pipeline stages,
                             * this will prevent the new instruction from being fetched in the current cycle*/
                             cpu->fetch_from_next_cycle = TRUE;
 
@@ -1444,13 +1453,13 @@ APEX_execute(APEX_CPU *cpu)
                     } else {
                         // The brranch should not be taken
 
-                        /* Check predicition. If branch was not taken predicition was correct continue without any action. 
+                        /* Check predicition. If branch was not taken predicition was correct continue without any action.
                             Otherwise bad predicition, revert PC to PC+4 and flush all previous stages. -H */
                         if (cpu->branch_exec.btb_prediciton == 1) {
                             // Set the new PC
                             cpu->pc = cpu->branch_exec.pc + 4;
 
-                            /* Since we are using reverse callbacks for pipeline stages, 
+                            /* Since we are using reverse callbacks for pipeline stages,
                             * this will prevent the new instruction from being fetched in the current cycle*/
                             cpu->fetch_from_next_cycle = TRUE;
 
@@ -1479,14 +1488,14 @@ APEX_execute(APEX_CPU *cpu)
                     // If positive flag is false, then branch should be taken. -H
                     if (cpu->positive_flag == FALSE)
                     {
-                        /* Check predicition. If branch was already taken predicition was correct continue without any action. 
+                        /* Check predicition. If branch was already taken predicition was correct continue without any action.
                             Otherwise bad predicition, revert PC to the instruction PC+imm and flush all previous stages. -H
                             0: Not Taken 1: Taken */
                         if (cpu->branch_exec.btb_prediciton == 0) {
                             // Set the new PC
                             cpu->pc = cpu->branch_exec.pc + cpu->branch_exec.imm;
 
-                            /* Since we are using reverse callbacks for pipeline stages, 
+                            /* Since we are using reverse callbacks for pipeline stages,
                             * this will prevent the new instruction from being fetched in the current cycle*/
                             cpu->fetch_from_next_cycle = TRUE;
 
@@ -1505,13 +1514,13 @@ APEX_execute(APEX_CPU *cpu)
                     } else {
                         // The brranch should not be taken
 
-                        /* Check predicition. If branch was not taken predicition was correct continue without any action. 
+                        /* Check predicition. If branch was not taken predicition was correct continue without any action.
                             Otherwise bad predicition, revert PC to PC+4 and flush all previous stages. -H */
                         if (cpu->branch_exec.btb_prediciton == 1) {
                             // Set the new PC
                             cpu->pc = cpu->branch_exec.pc + 4;
 
-                            /* Since we are using reverse callbacks for pipeline stages, 
+                            /* Since we are using reverse callbacks for pipeline stages,
                             * this will prevent the new instruction from being fetched in the current cycle*/
                             cpu->fetch_from_next_cycle = TRUE;
 
@@ -1736,7 +1745,7 @@ APEX_writeback(APEX_CPU *cpu)
         printf("Line 1391: inside cpu->branch_wb_has_insn\n");
         APEX_forward(cpu, cpu->branch_wb);
 
-        
+
         //This will have to be modified when BTB is added -J
         // The only branch instruction that requires write back is JLAR -H
         //if(cpu->branch_wb.opcode == OPCODE_HALT){
