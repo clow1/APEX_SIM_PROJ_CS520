@@ -112,6 +112,24 @@ print_memory(const APEX_CPU *cpu)
 }
 
 static void
+print_mem(const APEX_CPU *cpu, int start_addr, int end_addr)
+{
+    printf("\n----------\n%s\n----------\n", "Memory:");
+
+    for (int i=0; i < DATA_MEMORY_SIZE/cpu->code_memory_size; i+=2){
+  //    printf("cpu->data_memory[i]: %d \n", get_code_memory_index_from_pc(cpu->pc));
+      if (i == end_addr) break;
+      if (i == start_addr || i < end_addr ) {
+        printf("| MEM[%d]  \t| Data Value = %d \t|\n", i, cpu->data_memory[i] );
+
+      }
+
+    }
+    printf("\n");
+
+}
+
+static void
 print_iq(const APEX_CPU *cpu)
 {
   printf("\n----------\n%s\n----------\n", "IQ:");
@@ -221,6 +239,11 @@ print_rob(const APEX_CPU *cpu)
 
       printf("\n");
     }
+}
+static void
+print_lsq(APEX_CPU *cpu)
+{
+
 }
 
 /*
@@ -2099,6 +2122,7 @@ APEX_command(APEX_CPU *cpu, std::string  user_in)
       }
       else if(s1 == "STARTOVER") {
 
+        //cpu = APEX_cpu_init();
       //  cpu->pc = 4000;
       //  cpu->clock = 1;
         //WE NEED TO FLUSH THE PIPELINE
@@ -2116,6 +2140,21 @@ APEX_command(APEX_CPU *cpu, std::string  user_in)
         if (cpu->clock == stoi(tok.at(1))) {
             exit(0);
         }
+    }
+
+    if (tok.size() == 3) {
+      std::string s1 = tok.at(0);
+      std::string s2 = tok.at(1);
+      std::string s3 = tok.at(2);
+
+      if (s1 == "SHOWMEM"){
+        int start_addr = stoi(s2);
+        int end_addr = stoi(s3);
+        print_mem(cpu, start_addr, end_addr );
+
+      }
+
+
     }
 
 
