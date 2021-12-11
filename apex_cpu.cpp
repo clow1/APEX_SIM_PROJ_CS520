@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sstream>
 
 #include "apex_cpu.h"
 #include "apex_macros.h"
@@ -1784,4 +1785,22 @@ APEX_cpu_stop(APEX_CPU *cpu)
     free(cpu->code_memory);
     //free(cpu->filename);
     free(cpu);
+}
+
+void
+APEX_command(APEX_CPU *cpu, std::string  user_in)
+{
+  std::cout<<user_in<<std::endl;
+
+  std::vector<std::string> tok;
+  std::stringstream ss(user_in);
+  std::string buffer;
+
+
+
+    while (ss >> buffer){
+      tok.push_back(buffer);
+    }
+    std::cout<<tok.size()<<std::endl;
+
 }

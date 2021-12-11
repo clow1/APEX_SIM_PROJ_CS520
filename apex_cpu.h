@@ -14,6 +14,7 @@
 #include <queue>
 #include <list>
 #include <climits>
+#include <iostream>
 using namespace std;
 
 /* Format of an APEX instruction  */
@@ -53,7 +54,7 @@ typedef struct BT_Entry     //will likely need more ENTRIES
 {
   int opcode;
   int branch_pc;
-  int target_pc; 
+  int target_pc;
   int taken; //0 = not taken, 1 = taken
 }BT_Entry;
 
@@ -172,6 +173,8 @@ typedef struct APEX_CPU
     queue<IQ_Entry>* lsq; /*LSQ entry has the same
                           structure as an IQ entry.
                           use queue because in order*/
+
+
 } APEX_CPU;
 
 /*functional unit struct*/
@@ -184,4 +187,5 @@ APEX_Instruction *create_code_memory(const char *filename, int *size);
 APEX_CPU *APEX_cpu_init(const char *filename);
 void APEX_cpu_run(APEX_CPU *cpu);
 void APEX_cpu_stop(APEX_CPU *cpu);
+void APEX_command(APEX_CPU *cpu, std::string input);
 #endif
