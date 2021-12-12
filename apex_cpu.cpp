@@ -243,16 +243,82 @@ print_rob(const APEX_CPU *cpu)
 static void
 print_lsq(APEX_CPU *cpu)
 {
+  printf("\n----------\n%s\n----------\n", "LSQ:");
+
+  for (int i = 0; i < cpu->lsq->size(); i++) {
+
+    printf("ENTRY %d|| ", i);
+    if  (cpu->iq[i].status_bit == INVALID || cpu->iq[i].status_bit < 0 ||
+      cpu->iq[i].status_bit > 3)
+    {
+      printf("XX, ");
+    } else printf("%d, ", cpu->iq[i].fu_type);
+
+    if (cpu->iq[i].src1_rdy_bit == NOT_READY)
+    {
+      printf("XX, ");
+    } else printf("%d, ", cpu->iq[i].src1_rdy_bit);
+
+    if (cpu->iq[i].src1_tag == INVALID ||
+      cpu->iq[i].src1_tag < 0)
+    {
+      printf("XX, ");
+    }else printf("%d, ", cpu->iq[i].src1_tag);
+
+    if (cpu->iq[i].src1_rdy_bit == NOT_READY ||
+      cpu->iq[i].src1_rdy_bit < 0)
+    {
+      printf("XX, ");
+    } else printf("%d, ", cpu->iq[i].src1_val);
+
+    if (cpu->iq[i].src2_rdy_bit == NOT_READY ||
+      cpu->iq[i].src2_rdy_bit < 0)
+    {
+      printf("XX, ");
+    } else printf("%d, ", cpu->iq[i].src2_rdy_bit);
+
+    if (cpu->iq[i].src2_tag == INVALID ||
+      cpu->iq[i].src2_tag < 0) {
+      printf("XX, ");
+    } else printf("%d, ", cpu->iq[i].src2_tag);
+
+    if (cpu->iq[i].src2_rdy_bit == NOT_READY ||
+      cpu->iq[i].src2_rdy_bit < 0) {
+      printf("XX, ");
+    } else printf("%d, ", cpu->iq[i].src2_val);
+
+    if (cpu->iq[i].dest == INVALID) {
+      printf("XX ");
+    } else printf("%d ", cpu->iq[i].dest);
+    printf("\n");
+}
+
+printf("\n");
+
 
 }
 
 static void
 print_btb(APEX_CPU *cpu)
 {
-//  for (auto it = cpu->branch_predictor.btb.begin(); it != cpu->branch_predictor.btb.end(); it++)
-  //{
+  printf("\n----------\n%s\n----------\n", "BTB:");
 
-  //}
+  for (int i = 0; i < 4; i++){
+    printf("ENTRY %d ||", i);
+    if (!cpu->btb[i].valid)
+    {
+
+      printf("XX, ");
+
+    } else printf("%d ", cpu->btb[i].valid);
+
+    if (!cpu->btb[i].outcome)
+    {
+      printf("XX ");
+    } else printf("%d ", cpu->btb[i].outcome);
+
+    printf("\n");
+  } printf("\n");
 }
 
 /*
@@ -2130,7 +2196,10 @@ APEX_command(APEX_CPU *cpu, std::string  user_in)
         print_rob(cpu);
       }
       else if (s1 == "SHOWBTB") {
-
+        print_btb(cpu);
+      }
+      else if (s1 == "SHOWLSQ") {
+        print_lsq(cpu);
       }
       else if(s1 == "STARTOVER") {
 
