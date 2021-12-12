@@ -71,14 +71,22 @@ print_phys_reg_file(const APEX_CPU *cpu)
 
     for (int i = 0; i < 20 / 2; ++i)
     {
-        printf("P%-3d[%-3d] ", i, cpu->phys_regs[i]);
+      if (cpu->phys_regs[i].value == 0) {
+        printf("R%-3d[X] ",i);
+      } else {
+            printf("R%-3d[%-3d] ", i, cpu->phys_regs[i]);
+      }
     }
 
     printf("\n");
 
     for (int i = (20 / 2); i < 20; ++i)
     {
-        printf("P%-3d[%-3d] ", i, cpu->phys_regs[i]);
+      if (cpu->phys_regs[i].value == 0) {
+        printf("R%-3d[X] ",i);
+      } else {
+            printf("R%-3d[%-3d] ", i, cpu->phys_regs[i]);
+      }
     }
 
     printf("\n");
@@ -116,13 +124,13 @@ print_mem(const APEX_CPU *cpu, int start_addr, int end_addr)
 {
     printf("\n----------\n%s\n----------\n", "Memory:");
 
-    for (int i=0; i < DATA_MEMORY_SIZE/cpu->code_memory_size; i+=2){
+    for (int i=start_addr; i < DATA_MEMORY_SIZE/cpu->code_memory_size; i+=2){
   //    printf("cpu->data_memory[i]: %d \n", get_code_memory_index_from_pc(cpu->pc));
-      if (i == end_addr) break;
-      if (i == start_addr || i < end_addr ) {
+      if (i == end_addr+2) break;
+
         printf("| MEM[%d]  \t| Data Value = %d \t|\n", i, cpu->data_memory[i] );
 
-      }
+
 
     }
     printf("\n");
@@ -1674,7 +1682,7 @@ APEX_execute(APEX_CPU *cpu)
                     // JALR is always taken, therefore it was taken in the decode 1 stage. However, we need to store the caclulated result in the destination register -H
                     cpu->branch_exec.result_buffer = cpu->branch_exec.rs1_value + cpu->branch_exec.imm + 4;
 
-                  
+
                     printf("RS1 REG VALUE: %d\n", cpu->branch_exec.rs1_value  );
                     printf("RESULT: %d\n", cpu->branch_exec.result_buffer);
                     printf("DESTINATION %d\n", cpu->branch_exec.rd);
@@ -1981,7 +1989,7 @@ APEX_cpu_init(const char *filename)
         free(cpu);
         return NULL;
     }
-
+    cpu->single_step = 1;
     if (ENABLE_DEBUG_MESSAGES)
     {
         fprintf(stderr,
@@ -2161,6 +2169,10 @@ APEX_command(APEX_CPU *cpu, std::string  user_in)
       else if (s1 == "SHOWLSQ") {
         print_lsq(cpu);
       }
+      else if (s1 == "STOP")
+      {
+        exit(1);
+      }
       else if(s1 == "STARTOVER") {
 
         //cpu = APEX_cpu_init();
@@ -2172,10 +2184,6 @@ APEX_command(APEX_CPU *cpu, std::string  user_in)
     }
     if (tok.size() == 2) {
         std::string s1 = tok.at(0);
-      if (s1== "Carriage" && tok.at(1) == "run") {
-
-            cpu->single_step = TRUE;
-      }
 
       if (s1 == "RUN")
         if (cpu->clock == stoi(tok.at(1))) {
