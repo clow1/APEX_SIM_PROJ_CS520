@@ -171,6 +171,7 @@ typedef struct APEX_CPU
         - btb[3] - BNP
     */
     BTB_Entry btb[4]; // There are 4 types of branch instructions -H
+    int branch_flag; // Set flag if there is a branch instruction already executing in the pipeline. -H
 
     Rename_Entry rename_table[REG_FILE_SIZE+1];  /*last element in CC is the
                                         most recently allocated phys. reg*/
