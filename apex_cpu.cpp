@@ -329,10 +329,8 @@ print_btb(APEX_CPU *cpu)
 static void
 APEX_fetch(APEX_CPU *cpu)
 {
-
-    //I think fetch can go completely unchanged - J
     APEX_Instruction *current_ins;
-    if (cpu->fetch.has_insn && cpu->fetch.stall == FALSE)
+    if (cpu->fetch.has_insn == TRUE && cpu->fetch.stall == FALSE)
     {
         /* This fetches new branch target instruction from next cycle */
         if (cpu->fetch_from_next_cycle == TRUE)
@@ -457,9 +455,7 @@ APEX_fetch(APEX_CPU *cpu)
             case OPCODE_JALR:
             case OPCODE_RET:
                 // Check if other branches are in the pipeline and stall -H
-                printf("Branch Flag: %d\n", cpu->branch_flag);
                 if(cpu->branch_flag == TRUE) {
-                  printf("Branch exists in pipeline!\n");
                   cpu->fetch.stall = TRUE;
                 } else {
                   // Set branch flag to avoid multiple branches in the pipeline -H
@@ -552,7 +548,7 @@ Stall if free list isn't empty
 
 - J
 */
-    if(cpu->decode1.has_insn){
+    if(cpu->decode1.has_insn == TRUE){
 
         if(!available_ROB(cpu) || !available_IQ(cpu)){//All instructions need a slot in the ROB & IQ -J
             cpu->fetch.stall = TRUE; //Stall -J
@@ -602,7 +598,7 @@ Stall if free list isn't empty
                 case OPCODE_BP:
                 case OPCODE_BNP:
                     // If btb miss, set default predicition of Taken -H
-                    if(cpu->decode1.btb_miss){
+                    if(cpu->decode1.btb_miss == TRUE){
                         cpu->decode1.btb_prediciton = 1;
                     }
                     break;
@@ -698,7 +694,7 @@ Rj <-- Rk <op> Rl
 6) Dispatch to IQ (& LSQ if need be)
 
 */
-    if(cpu->decode2.has_insn){
+    if(cpu->decode2.has_insn == TRUE){
        int free_reg = -1; //If it stays -1, then we know that it's an instruction w/o a destination
 
        // Insert entry into ROB before renaming -H
@@ -769,41 +765,10 @@ Rj <-- Rk <op> Rl
                 // BZ, BNZ, BP, and BNP don't have any source registers therefore require no action in the rename stage -H
             }
 
-  //  printf("Line 378 is where I start to clear the values for IQ, LSQ, ROB\n"); //Eventually, we'll have to add switch case here to clear for the other branches.
-        /*if (cpu->decode2.opcode == OPCODE_JUMP)
-        {
-
-            //clearing all the IQ_Entry entries out -C
-            for (int i = 0; i < 8; i++) {
-
-              {
-                IQ_Entry entry;
-                cpu->iq[i] = entry;
-
-
-              }
-            }
-
-            //clear the rob list.
-            cpu->rob->clear();
-            //clearing and resetting the lsq. -C
-            delete cpu->lsq;
-            cpu->lsq = new queue<IQ_Entry>;
-
-          //  char entry_index = index_IQ(cpu);
-            cpu->iq[0].status_bit = 1;
-            cpu->iq[0].fu_type = cpu->decode2.vfu;
-            cpu->iq[0].opcode = cpu->decode2.opcode;
-
-            //ADD THE INSTRUCTION BACK TO THE FRONT OF ROB AND IQ
-
-          }
-
-        else {*/
         //Filling out IQ entry -J
         char entry_index = index_IQ(cpu);
         cpu->iq[entry_index].status_bit = 1;
-        cpu->iq[entry_index].iq_time_padding = 0;
+        //cpu->iq[entry_index].iq_time_padding = 0;
         cpu->iq[entry_index].fu_type = cpu->decode2.vfu;
         cpu->iq[entry_index].opcode = cpu->decode2.opcode;
         switch(cpu->decode2.opcode){//Instructions w/ literals -J
@@ -922,7 +887,7 @@ static int check_LSQ(APEX_CPU* cpu, int entry_index){
         3) Memory is free
         */
         case OPCODE_LOAD:
-            if(!cpu->memory.has_insn &&
+            if(cpu->memory.has_insn == FALSE &&
                 cpu->iq[entry_index].pc_value == cpu->lsq->front().pc_value){
                 return entry_index;
             }
@@ -934,7 +899,7 @@ static int check_LSQ(APEX_CPU* cpu, int entry_index){
         3) When memory is free
         */
         case OPCODE_STORE:
-            if(!cpu->memory.has_insn &&
+            if(cpu->memory.has_insn == FALSE &&
                 cpu->iq[entry_index].pc_value == cpu->lsq->front().pc_value &&
                 cpu->iq[entry_index].pc_value == cpu->rob->front().pc_value){
                 return entry_index;
@@ -962,19 +927,19 @@ free_VFU(APEX_CPU* cpu, int fu_type){
     switch(fu_type){//Checking VFUs -J
         //Check MUL VFU -J
         case MUL_VFU:
-            if(cpu->mult_exec.has_insn){
+            if(cpu->mult_exec.has_insn == TRUE){
                 return FALSE;
             }
             break;
         //Check INT VFU -J
         case INT_VFU:
-            if(cpu->int_exec.has_insn){
+            if(cpu->int_exec.has_insn == TRUE){
                 return FALSE;
             }
             break;
         //Check BRANCH VFU -J
         case BRANCH_VFU:
-            if(cpu->branch_exec.has_insn){
+            if(cpu->branch_exec.has_insn == TRUE){
                 return FALSE;
             }
         break;
@@ -1047,7 +1012,8 @@ APEX_ISSUE_QUEUE(APEX_CPU *cpu){//Will handle grabbing the correct instructions 
     }
 
     //We have a valid instruction to issue
-    if(entry_index != 100 && cpu->iq[entry_index].iq_time_padding == 1){
+    //&& cpu->iq[entry_index].iq_time_padding == 1
+    if(entry_index != 100){
 
         // Remove entry to exetue from IQ and LSQ (if MEM operation)
         cpu->iq[entry_index].status_bit = 0;
@@ -1150,7 +1116,6 @@ APEX_ISSUE_QUEUE(APEX_CPU *cpu){//Will handle grabbing the correct instructions 
                     //JALR uses branch unit. -C
                     //dest src1 literal
                     case OPCODE_JALR:
-                        printf("I got here!\n");
                         cpu->branch_exec.rs1 = issuing_instr.src1_tag;
                         cpu->branch_exec.rd = issuing_instr.dest;
                         cpu->branch_exec.imm = issuing_instr.literal;
@@ -1162,7 +1127,7 @@ APEX_ISSUE_QUEUE(APEX_CPU *cpu){//Will handle grabbing the correct instructions 
         }
     }
 }
-void IQ_cycle_advancement(APEX_CPU *cpu){
+/*void IQ_cycle_advancement(APEX_CPU *cpu){
   for(int i = 0; i < 8; i++){
     if(cpu->iq[i].status_bit == 1){
       cpu->iq[i].iq_time_padding = 1;
@@ -1170,6 +1135,7 @@ void IQ_cycle_advancement(APEX_CPU *cpu){
   }
 
 }
+*/
 
 
 /*
@@ -1182,12 +1148,12 @@ APEX_execute(APEX_CPU *cpu)
 {
     //Grab instruction from issue queue
     APEX_ISSUE_QUEUE(cpu);
-    IQ_cycle_advancement(cpu);
+    //IQ_cycle_advancement(cpu);
     /*
         Multiplication section
     */
-    if(cpu->mult_exec.has_insn){
-        if(cpu->mult_exec.stage_delay > 4){
+    if(cpu->mult_exec.has_insn == TRUE){
+        if(cpu->mult_exec.stage_delay > 2){
             switch (cpu->mult_exec.opcode){
                 case OPCODE_MUL:
                 {
@@ -1227,7 +1193,8 @@ APEX_execute(APEX_CPU *cpu)
         Check if there is a valid instruction to process, since memory instructions take 2 cycles in the memory stage we need to check for stalls -H
     */
 
-    if(cpu->int_exec.has_insn && !cpu->int_exec.stall){
+    if(cpu->int_exec.has_insn == TRUE && cpu->int_exec.stall != TRUE){
+        printf("INSIDE INT EXE: %d\n", cpu->int_exec.opcode );
         int mem_instruction = FALSE;
 
         switch (cpu->int_exec.opcode){
@@ -1437,10 +1404,11 @@ APEX_execute(APEX_CPU *cpu)
             printf("Execute Int: %d\n", cpu->int_exec.opcode);
         }
 
-        if(mem_instruction){
+        if(mem_instruction == TRUE){
 
             // Memory instructions require 2 cycles, therefore we need to stall if a second memory instruction immedietly follows another -H
-            if(cpu->memory.has_insn) {
+            if(cpu->memory.has_insn == TRUE) {
+              printf("STALLLL!!!!\n");
                 cpu->int_exec.stall = TRUE;
             } else {
                 // If there is no instruction currently in the mem stage advance current instruction to next stage -H
@@ -1454,12 +1422,9 @@ APEX_execute(APEX_CPU *cpu)
 
     }
     /*
-        Branch section
+        Branch section -H
     */
-    printf("Line 1118: (cpu->branch_exec.has_insn) : %d\n ", cpu->branch_exec.has_insn);
-    if(cpu->branch_exec.has_insn){
-        printf("Line 1120: Inside branch_execution conditional\n");
-        //Whoever does branch prediction will have to edit this portion significantly -J
+    if(cpu->branch_exec.has_insn == TRUE){
             switch(cpu->branch_exec.opcode){
               case OPCODE_BZ:
                 {
@@ -1724,17 +1689,15 @@ APEX_execute(APEX_CPU *cpu)
 
                 case OPCODE_JALR:
                 {
-                    printf("Or I got here!\n");
+
                     // JALR is always taken, therefore it was taken in the decode 1 stage. However, we need to store the caclulated result in the destination register -H
                     cpu->branch_exec.result_buffer = cpu->branch_exec.rs1_value + cpu->branch_exec.imm + 4;
 
                   
                     printf("RS1 REG VALUE: %d\n", cpu->branch_exec.rs1_value  );
                     printf("RESULT: %d\n", cpu->branch_exec.result_buffer);
+                    printf("DESTINATION %d\n", cpu->branch_exec.rd);
 
-                    // Reset branch flag and stall -H
-                    cpu->branch_flag = FALSE;
-                    cpu->fetch.stall = FALSE;
                     break;
 
                 }
@@ -1771,9 +1734,10 @@ APEX_execute(APEX_CPU *cpu)
 static void
 APEX_memory(APEX_CPU *cpu)
 {
-    if (cpu->memory.has_insn)
+    if (cpu->memory.has_insn == TRUE)
     {
-        if(cpu->memory.stage_delay < 2){
+        if(cpu->memory.stage_delay > 1){
+          printf("EXECUTING  MEM %d\n", cpu->memory.opcode );
 
             switch (cpu->memory.opcode)
             {
@@ -1806,7 +1770,7 @@ APEX_memory(APEX_CPU *cpu)
             }
 
             // The mem instruction is complete, check if another mem operation is being stalled in exe stage -H
-            if(cpu->int_exec.stall) {
+            if(cpu->int_exec.stall == TRUE) {
                 cpu->int_exec.stall = FALSE;
             }
 
@@ -1894,7 +1858,7 @@ APEX_writeback(APEX_CPU *cpu)
 {
 
     //Handling forwarding write backs -J
-    if(cpu->mult_wb.has_insn){
+    if(cpu->mult_wb.has_insn == TRUE){
         APEX_forward(cpu, cpu->mult_wb);
         cpu->rename_table[CC_INDEX].phys_reg_id = cpu->mult_wb.rd;
         cpu->mult_wb.has_insn = FALSE;
@@ -1904,7 +1868,7 @@ APEX_writeback(APEX_CPU *cpu)
         }
     }
     // Int operations writeback stage -H
-    if(cpu->int_wb.has_insn){
+    if(cpu->int_wb.has_insn == TRUE){
         APEX_forward(cpu, cpu->int_wb);
         cpu->rename_table[CC_INDEX].phys_reg_id = cpu->mult_wb.rd;
         cpu->int_wb.has_insn = FALSE;
@@ -1913,7 +1877,7 @@ APEX_writeback(APEX_CPU *cpu)
             printf("Writeback Int: %d\n", cpu->int_wb.opcode);
         }
     }
-    if(cpu->mem_wb.has_insn){
+    if(cpu->mem_wb.has_insn == TRUE){
         APEX_forward(cpu, cpu->mem_wb);
         switch(cpu->mem_wb.opcode){
             case OPCODE_LOAD:
@@ -1926,31 +1890,25 @@ APEX_writeback(APEX_CPU *cpu)
             printf("Writeback Mem: %d\n", cpu->mem_wb.opcode);
         }
     }
-    if(cpu->branch_wb.has_insn){
-        printf("Line 1391: inside cpu->branch_wb_has_insn\n");
+    if(cpu->branch_wb.has_insn == TRUE){
         APEX_forward(cpu, cpu->branch_wb);
 
+        switch(cpu->branch_wb.opcode){
 
-        //This will have to be modified when BTB is added -J
-        // The only branch instruction that requires write back is JLAR -H
-        //if(cpu->branch_wb.opcode == OPCODE_HALT){
-            //No branching when a HALT is hit -J
-        //}else{
-            switch(cpu->branch_wb.opcode){
+            case OPCODE_JALR:
+                cpu->rename_table[CC_INDEX].phys_reg_id = cpu->branch_wb.rd;
 
-                case OPCODE_JALR:
-                    cpu->rename_table[CC_INDEX].phys_reg_id = cpu->branch_wb.rd;
-                    break;
-            }
+                // Reset branch flag and stall -H
+                cpu->branch_flag = FALSE;
+                cpu->fetch.stall = FALSE;
+                break;
+        }
 
-            cpu->branch_wb.has_insn = FALSE;
+        cpu->branch_wb.has_insn = FALSE;
 
-            if (ENABLE_DEBUG_MESSAGES) {
-                printf("Writeback Branch: %d\n", cpu->branch_wb.opcode);
-            }
-
-
-        //}
+        if (ENABLE_DEBUG_MESSAGES) {
+            printf("Writeback Branch: %d\n", cpu->branch_wb.opcode);
+        }
     }
 
     /* Default */
@@ -1981,6 +1939,7 @@ APEX_commitment(APEX_CPU* cpu){
                         - Write contents back into argitectural register
                         - Free up the physical register
                     */
+                    printf("COMMIT RESULT: %d, %d\n", rob_entry.result, rob_entry.opcode);
                     cpu->arch_regs[rob_entry.ar_addr].value = rob_entry.result;
                     cpu->arch_regs[rob_entry.ar_addr].src_bit = 1;
                     cpu->free_list->push(cpu->rename_table[rob_entry.ar_addr].phys_reg_id);
@@ -2093,7 +2052,7 @@ APEX_cpu_init(const char *filename)
     for(i = 0; i < 8; i++){
         IQ_Entry iq_entry;
         iq_entry.status_bit = 0;
-        iq_entry.iq_time_padding = 0;
+        //iq_entry.iq_time_padding = 0;
         iq_entry.src1_tag = -1;
         iq_entry.src2_tag = -1;
         iq_entry.src1_rdy_bit = 0;
@@ -2138,12 +2097,6 @@ APEX_cpu_run(APEX_CPU *cpu)
             printf("--------------------------------------------\n");
         }
 
-        /*if (display_state)
-        {
-            fprintf(fp,"--------------------------------------------\n");
-            fprintf(fp,"Clock Cycle #: %d\n", cpu->clock);
-            fprintf(fp,"--------------------------------------------\n");
-        }*/
         if (APEX_commitment(cpu)){
             /* Halt in writeback stage */
             printf("APEX_CPU: Simulation Complete, cycles = %d instructions = %d\n", cpu->clock, cpu->insn_completed);
@@ -2178,28 +2131,6 @@ APEX_cpu_run(APEX_CPU *cpu)
         APEX_command(cpu,cpu->command);
         cpu->clock++;
     }
-    //Do display stuff
-/*  Old display code. Not sure if any of it will remain relevant.
-    printf("Display %s stuff goes here!!\n", arg);
-    if(strcmp(arg, "simulate") == 0 || strcmp(arg, "single_step") == 0){
-        simulate_display(cpu);
-    }else if(strcmp(arg, "display") == 0){
-        simulate_display(cpu);
-        fclose(fp);
-        fp = fopen("temp.txt", "r");
-        char c = fgetc(fp);
-        while(c != EOF){
-            printf("%c", c);
-            c = fgetc(fp);
-        }
-        fclose(fp);
-        remove("temp.txt");
-        simulate_display(cpu);
-    }else if(strcmp(arg, "show_mem") == 0){
-        int data = cpu->data_memory[mem_address_wanted];
-        printf("mem[%d] = %d\n", mem_address_wanted, data);
-    }
-*/
 }
 
 /*
