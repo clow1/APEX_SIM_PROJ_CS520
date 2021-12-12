@@ -102,6 +102,8 @@ typedef struct IQ_Entry
   int pc_value; //For tiebreaking -J
   // We need the prediction in the exe stage for branches -H
   int btb_prediciton; // This will store the predicition to take / NOT take branch -H
+
+  int iq_time_padding; //Make it wait a cycle before getting grabbed -J
 }IQ_Entry;
 
 
@@ -171,6 +173,7 @@ typedef struct APEX_CPU
         - btb[3] - BNP
     */
     BTB_Entry btb[4]; // There are 4 types of branch instructions -H
+    int branch_flag; // Set flag if there is a branch instruction already executing in the pipeline. -H
 
     Rename_Entry rename_table[REG_FILE_SIZE+1];  /*last element in CC is the
                                         most recently allocated phys. reg*/
