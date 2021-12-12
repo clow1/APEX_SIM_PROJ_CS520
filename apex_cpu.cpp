@@ -133,11 +133,64 @@ static void
 print_iq(const APEX_CPU *cpu)
 {
   printf("\n----------\n%s\n----------\n", "IQ:");
-  for (int i = 0; i < 6; i++)
+  for (int i = 0; i < 8; i++)
   {
+    printf("ENTRY %d || ", i);
+      if (cpu->iq[i].status_bit == INVALID && cpu->iq[i].fu_type <=0) {
+        printf("XX, ");
+        printf("XX, ");
+      } else {
+          printf("%d, ", cpu->iq[i].status_bit);
+          printf("%d, ", cpu->iq[i].fu_type);
+      }
+
+      if (cpu->iq[i].src1_rdy_bit == NOT_READY &&
+        cpu->iq[i].fu_type <=0)
+      {
+        printf("XX, ");
+      } else printf("%d, ", cpu->iq[i].src1_rdy_bit);
+
+      if ((cpu->iq[i].src1_rdy_bit == NOT_READY ||
+        cpu->iq[i].src1_tag ==-1 ))
+      {
+        printf("XX, "); //tag
+        printf("XX, "); //val
+      }else {
+        printf("%d, ", cpu->iq[i].src1_tag);
+        printf("%d, ", cpu->iq[i].src1_val);
+      }
+
+      if (cpu->iq[i].src2_rdy_bit == NOT_READY &&
+        cpu->iq[i].fu_type <=0)
+        {
+        printf("XX, ");
+
+      } else printf("%d, ", cpu->iq[i].src2_rdy_bit);
+
+        if ((cpu->iq[i].src2_rdy_bit == NOT_READY ||
+          cpu->iq[i].src2_tag ==-1 ))
+        {
+            printf("XX, "); //tag
+            printf("XX, "); //val
+        }else {
+            printf("%d, ", cpu->iq[i].src2_tag);
+            printf("%d, ", cpu->iq[i].src2_val);
+        }
+      if (cpu->iq[i].dest == INVALID) {
+        printf("XX ");
+      } else printf("%d ", cpu->iq[i].dest);
+      printf("\n");
+
+
+  }
 
 
 
+
+      printf("\n");
+
+
+    /**
       printf("ENTRY %d || ", i);
         if (cpu->iq[i].status_bit == INVALID) {
           printf("XX, ");
@@ -186,9 +239,10 @@ print_iq(const APEX_CPU *cpu)
           printf("XX ");
         } else printf("%d ", cpu->iq[i].dest);
         printf("\n");
-    }
+        **/
 
-  printf("\n");
+
+
 }
 
 static void
