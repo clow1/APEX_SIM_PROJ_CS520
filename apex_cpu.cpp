@@ -434,7 +434,6 @@ APEX_fetch(APEX_CPU *cpu)
 
             // Lookup branch instruction in BTB to determine if it's a hit or miss -H
             case OPCODE_BZ:
-                printf("Valid BTB Entry: %d\n", cpu->btb[0].valid);
                 cpu->fetch.vfu = BRANCH_VFU;
                 // If BTB entry is valid, it results in a HIT. Otherwise results in a MISS -H
                 if(cpu->btb[0].valid) {
@@ -511,12 +510,10 @@ APEX_fetch(APEX_CPU *cpu)
 
         /* Update PC for next instruction */
         // If BTB Hit and predicition is taken, then change PC value to imm -H
-        printf("Brnach Hit/Miss: %d\n", cpu->fetch.btb_miss);
 
         if(cpu->fetch.btb_miss == FALSE && cpu->fetch.btb_prediciton == 1) {
             cpu->pc = cpu->fetch.pc + cpu->fetch.imm;
         } else {
-            printf("Hit miss\n");
             cpu->pc += 4;
         }
 
@@ -527,10 +524,6 @@ APEX_fetch(APEX_CPU *cpu)
         if (cpu->fetch.opcode == OPCODE_HALT)
         {
             cpu->fetch.has_insn = FALSE;
-        }
-
-        if (ENABLE_DEBUG_MESSAGES) {
-            printf("Fetch: %s\n", cpu->decode1.opcode_str);
         }
     }
 }
@@ -678,10 +671,6 @@ Stall if free list isn't empty
                 cpu->decode1.has_insn = FALSE;
                 cpu->fetch.stall = FALSE;
             }
-        }
-
-        if (ENABLE_DEBUG_MESSAGES) {
-            printf("Decode 1: %s\n", cpu->decode2.opcode_str);
         }
     }
 
@@ -875,10 +864,6 @@ Rj <-- Rk <op> Rl
 
         cpu->decode2.has_insn = FALSE;
         //We don't forward data in pipeline to exec right away like before bc IQ is Out-of-Order -J
-
-        if (ENABLE_DEBUG_MESSAGES) {
-            printf("Decode 2: %s\n", cpu->decode2.opcode_str);
-        }
     }
 }
 
@@ -1188,9 +1173,6 @@ APEX_execute(APEX_CPU *cpu)
             cpu->mult_exec.stage_delay++;
         }
 
-        if (ENABLE_DEBUG_MESSAGES) {
-            printf("Execute Mul: %d\n", cpu->mult_exec.opcode);
-        }
     }
 
     /*
@@ -1199,7 +1181,6 @@ APEX_execute(APEX_CPU *cpu)
     */
 
     if(cpu->int_exec.has_insn == TRUE && cpu->int_exec.stall != TRUE){
-        printf("INSIDE INT EXE: %d\n", cpu->int_exec.opcode );
         int mem_instruction = FALSE;
 
         switch (cpu->int_exec.opcode){
@@ -1405,15 +1386,10 @@ APEX_execute(APEX_CPU *cpu)
             }
         }
 
-        if (ENABLE_DEBUG_MESSAGES) {
-            printf("Execute Int: %d\n", cpu->int_exec.opcode);
-        }
-
         if(mem_instruction == TRUE){
 
             // Memory instructions require 2 cycles, therefore we need to stall if a second memory instruction immedietly follows another -H
             if(cpu->memory.has_insn == TRUE) {
-              printf("STALLLL!!!!\n");
                 cpu->int_exec.stall = TRUE;
             } else {
                 // If there is no instruction currently in the mem stage advance current instruction to next stage -H
@@ -1680,13 +1656,7 @@ APEX_execute(APEX_CPU *cpu)
                 {
 
                     // JALR is always taken, therefore it was taken in the decode 1 stage. However, we need to store the caclulated result in the destination register -H
-                    cpu->branch_exec.result_buffer = cpu->branch_exec.rs1_value + cpu->branch_exec.imm + 4;
-
-
-                    printf("RS1 REG VALUE: %d\n", cpu->branch_exec.rs1_value  );
-                    printf("RESULT: %d\n", cpu->branch_exec.result_buffer);
-                    printf("DESTINATION %d\n", cpu->branch_exec.rd);
-
+                    cpu->branch_exec.result_buffer = cpu->branch_exec.pc + 4;
                     break;
                 }
 
@@ -1699,10 +1669,6 @@ APEX_execute(APEX_CPU *cpu)
 
         cpu->branch_wb = cpu->branch_exec;
         cpu->branch_exec.has_insn = FALSE;
-
-        if (ENABLE_DEBUG_MESSAGES) {
-            printf("Execute Branch: %d\n", cpu->branch_wb.opcode);
-        }
 
     }
 
@@ -1722,7 +1688,6 @@ APEX_memory(APEX_CPU *cpu)
     if (cpu->memory.has_insn == TRUE)
     {
         if(cpu->memory.stage_delay > 1){
-          printf("EXECUTING  MEM %d\n", cpu->memory.opcode );
 
             switch (cpu->memory.opcode)
             {
@@ -1761,10 +1726,6 @@ APEX_memory(APEX_CPU *cpu)
 
         }else{
             cpu->memory.stage_delay++;
-        }
-
-        if (ENABLE_DEBUG_MESSAGES) {
-            printf("Memory: %d\n", cpu->memory.opcode);
         }
 
     }
@@ -1847,20 +1808,12 @@ APEX_writeback(APEX_CPU *cpu)
         APEX_forward(cpu, cpu->mult_wb);
         cpu->rename_table[CC_INDEX].phys_reg_id = cpu->mult_wb.rd;
         cpu->mult_wb.has_insn = FALSE;
-
-        if (ENABLE_DEBUG_MESSAGES) {
-            printf("Writeback MUL: %d\n", cpu->mult_wb.opcode);
-        }
     }
     // Int operations writeback stage -H
     if(cpu->int_wb.has_insn == TRUE){
         APEX_forward(cpu, cpu->int_wb);
         cpu->rename_table[CC_INDEX].phys_reg_id = cpu->mult_wb.rd;
         cpu->int_wb.has_insn = FALSE;
-
-        if (ENABLE_DEBUG_MESSAGES) {
-            printf("Writeback Int: %d\n", cpu->int_wb.opcode);
-        }
     }
     if(cpu->mem_wb.has_insn == TRUE){
         APEX_forward(cpu, cpu->mem_wb);
@@ -1870,10 +1823,6 @@ APEX_writeback(APEX_CPU *cpu)
             break;
         }
         cpu->mem_wb.has_insn = FALSE;
-
-        if (ENABLE_DEBUG_MESSAGES) {
-            printf("Writeback Mem: %d\n", cpu->mem_wb.opcode);
-        }
     }
     if(cpu->branch_wb.has_insn == TRUE){
         APEX_forward(cpu, cpu->branch_wb);
@@ -1890,10 +1839,6 @@ APEX_writeback(APEX_CPU *cpu)
         }
 
         cpu->branch_wb.has_insn = FALSE;
-
-        if (ENABLE_DEBUG_MESSAGES) {
-            printf("Writeback Branch: %d\n", cpu->branch_wb.opcode);
-        }
     }
 
     /* Default */
@@ -1924,11 +1869,10 @@ APEX_commitment(APEX_CPU* cpu){
                         - Write contents back into argitectural register
                         - Free up the physical register
                     */
-                    printf("COMMIT RESULT: %d, %d\n", rob_entry.result, rob_entry.opcode);
                     cpu->arch_regs[rob_entry.ar_addr].value = rob_entry.result;
                     cpu->arch_regs[rob_entry.ar_addr].src_bit = 1;
                     cpu->free_list->push(cpu->rename_table[rob_entry.ar_addr].phys_reg_id);
-                    printf("%d RESULT = %d\n", rob_entry.pc_value, rob_entry.result); // Useful for debugging results, so I'm leaving it in -J
+                    //printf("%d RESULT = %d\n", rob_entry.pc_value, rob_entry.result); // Useful for debugging results, so I'm leaving it in -J
                     break;
                 case OPCODE_HALT:
                     return 1;
