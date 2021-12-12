@@ -301,56 +301,57 @@ print_lsq(APEX_CPU *cpu)
 
   for (int i = 0; i < cpu->lsq->size(); i++) {
 
-    printf("ENTRY %d|| ", i);
-    if  (cpu->iq[i].status_bit == INVALID || cpu->iq[i].status_bit < 0 ||
-      cpu->iq[i].status_bit > 3)
-    {
-      printf("XX, ");
-    } else printf("%d, ", cpu->iq[i].fu_type);
+      printf("ENTRY %d || ", i);
+        if (cpu->iq[i].status_bit == INVALID && cpu->iq[i].fu_type <=0) {
+          printf("XX, ");
+          printf("XX, ");
+        } else {
+            printf("%d, ", cpu->iq[i].status_bit);
+            printf("%d, ", cpu->iq[i].fu_type);
+        }
 
-    if (cpu->iq[i].src1_rdy_bit == NOT_READY)
-    {
-      printf("XX, ");
-    } else printf("%d, ", cpu->iq[i].src1_rdy_bit);
+        if (cpu->iq[i].src1_rdy_bit == NOT_READY &&
+          cpu->iq[i].fu_type <=0)
+        {
+          printf("XX, ");
+        } else printf("%d, ", cpu->iq[i].src1_rdy_bit);
 
-    if (cpu->iq[i].src1_tag == INVALID ||
-      cpu->iq[i].src1_tag < 0)
-    {
-      printf("XX, ");
-    }else printf("%d, ", cpu->iq[i].src1_tag);
+        if ((cpu->iq[i].src1_rdy_bit == NOT_READY ||
+          cpu->iq[i].src1_tag ==-1 ))
+        {
+          printf("XX, "); //tag
+          printf("XX, "); //val
+        }else {
+          printf("%d, ", cpu->iq[i].src1_tag);
+          printf("%d, ", cpu->iq[i].src1_val);
+        }
 
-    if (cpu->iq[i].src1_rdy_bit == NOT_READY ||
-      cpu->iq[i].src1_rdy_bit < 0)
-    {
-      printf("XX, ");
-    } else printf("%d, ", cpu->iq[i].src1_val);
+        if (cpu->iq[i].src2_rdy_bit == NOT_READY &&
+          cpu->iq[i].fu_type <=0)
+          {
+          printf("XX, ");
 
-    if (cpu->iq[i].src2_rdy_bit == NOT_READY ||
-      cpu->iq[i].src2_rdy_bit < 0)
-    {
-      printf("XX, ");
-    } else printf("%d, ", cpu->iq[i].src2_rdy_bit);
+        } else printf("%d, ", cpu->iq[i].src2_rdy_bit);
 
-    if (cpu->iq[i].src2_tag == INVALID ||
-      cpu->iq[i].src2_tag < 0) {
-      printf("XX, ");
-    } else printf("%d, ", cpu->iq[i].src2_tag);
+          if ((cpu->iq[i].src2_rdy_bit == NOT_READY ||
+            cpu->iq[i].src2_tag ==-1 ))
+          {
+              printf("XX, "); //tag
+              printf("XX, "); //val
+          }else {
+              printf("%d, ", cpu->iq[i].src2_tag);
+              printf("%d, ", cpu->iq[i].src2_val);
+          }
+        if (cpu->iq[i].dest == INVALID) {
+          printf("XX ");
+        } else printf("%d ", cpu->iq[i].dest);
+        printf("\n");
 
-    if (cpu->iq[i].src2_rdy_bit == NOT_READY ||
-      cpu->iq[i].src2_rdy_bit < 0) {
-      printf("XX, ");
-    } else printf("%d, ", cpu->iq[i].src2_val);
+      }
 
-    if (cpu->iq[i].dest == INVALID) {
-      printf("XX ");
-    } else printf("%d ", cpu->iq[i].dest);
-    printf("\n");
-}
+      printf("\n");
 
-printf("\n");
-
-
-}
+    }
 
 static void
 print_btb(APEX_CPU *cpu)
@@ -386,7 +387,7 @@ APEX_fetch(APEX_CPU *cpu)
 
     //I think fetch can go completely unchanged - J
     APEX_Instruction *current_ins;
-    if (cpu->fetch.has_insn && cpu->fetch.stall == FALSE)
+    if (cpu->fetch.has_insn && !cpu->fetch.stall)
     {
         /* This fetches new branch target instruction from next cycle */
         if (cpu->fetch_from_next_cycle == TRUE)
@@ -427,106 +428,60 @@ APEX_fetch(APEX_CPU *cpu)
 
             // Lookup branch instruction in BTB to determine if it's a hit or miss -H
             case OPCODE_BZ:
-                // Check if other branches are in the pipeline and stall -H
-                if(cpu->branch_flag == TRUE) {
-                  cpu->fetch.stall = TRUE;
+                printf("Valid BTB Entry: %d\n", cpu->btb[0].valid);
+                cpu->fetch.vfu = BRANCH_VFU;
+                // If BTB entry is valid, it results in a HIT. Otherwise results in a MISS -H
+                if(cpu->btb[0].valid) {
+                    cpu->fetch.btb_miss = FALSE;
+                    // If HIT, set predicition based on btb lookup -H
+                    cpu->fetch.btb_prediciton = cpu->btb[0].outcome;
                 } else {
-                  cpu->fetch.vfu = BRANCH_VFU;
-                  // Set branch flag to avoid multiple branches in the pipeline -H
-                  cpu->branch_flag = TRUE;
-
-                  // If BTB entry is valid, it results in a HIT. Otherwise results in a MISS -H
-                  if(cpu->btb[0].valid) {
-                      cpu->fetch.btb_miss = FALSE;
-                      // If HIT, set predicition based on btb lookup -H
-                      cpu->fetch.btb_prediciton = cpu->btb[0].outcome;
-                  } else {
-                      cpu->fetch.btb_miss = TRUE;
-                  }
+                    cpu->fetch.btb_miss = TRUE;
                 }
-                
                 break;
 
             case OPCODE_BNZ:
-                // Check if other branches are in the pipeline and stall -H
-                if(cpu->branch_flag == TRUE) {
-                  cpu->fetch.stall = TRUE;
+                cpu->fetch.vfu = BRANCH_VFU;
+                // If BTB entry is valid, it results in a HIT. Otherwise results in a MISS -H
+                if(cpu->btb[1].valid) {
+                    cpu->fetch.btb_miss = FALSE;
+                    // If HIT, set predicition based on btb lookup -H
+                    cpu->fetch.btb_prediciton = cpu->btb[1].outcome;
                 } else {
-                  cpu->fetch.vfu = BRANCH_VFU;
-                  // Set branch flag to avoid multiple branches in the pipeline -H
-                  cpu->branch_flag = TRUE;
-
-                  // If BTB entry is valid, it results in a HIT. Otherwise results in a MISS -H
-                  if(cpu->btb[1].valid) {
-                      cpu->fetch.btb_miss = FALSE;
-                      // If HIT, set predicition based on btb lookup -H
-                      cpu->fetch.btb_prediciton = cpu->btb[1].outcome;
-                  } else {
-                      cpu->fetch.btb_miss = TRUE;
-                  }
+                    cpu->fetch.btb_miss = TRUE;
                 }
                 break;
 
             case OPCODE_BP:
-                // Check if other branches are in the pipeline and stall -H
-                if(cpu->branch_flag == TRUE) {
-                  cpu->fetch.stall = TRUE;
+                cpu->fetch.vfu = BRANCH_VFU;
+                // If BTB entry is valid, it results in a HIT. Otherwise results in a MISS -H
+                if(cpu->btb[2].valid) {
+                    cpu->fetch.btb_miss = FALSE;
+                    // If HIT, set predicition based on btb lookup -H
+                    cpu->fetch.btb_prediciton = cpu->btb[2].outcome;
                 } else {
-                  cpu->fetch.vfu = BRANCH_VFU;
-                  // Set branch flag to avoid multiple branches in the pipeline -H
-                  cpu->branch_flag = TRUE;
-
-                  // If BTB entry is valid, it results in a HIT. Otherwise results in a MISS -H
-                  if(cpu->btb[2].valid) {
-                      cpu->fetch.btb_miss = FALSE;
-                      // If HIT, set predicition based on btb lookup -H
-                      cpu->fetch.btb_prediciton = cpu->btb[2].outcome;
-                  } else {
-                      cpu->fetch.btb_miss = TRUE;
-                  }
+                    cpu->fetch.btb_miss = TRUE;
                 }
                 break;
 
             case OPCODE_BNP:
-                // Check if other branches are in the pipeline and stall -H
-                if(cpu->branch_flag == TRUE) {
-                  cpu->fetch.stall = TRUE;
+                cpu->fetch.vfu = BRANCH_VFU;
+                // If BTB entry is valid, it results in a HIT. Otherwise results in a MISS -H
+                if(cpu->btb[3].valid) {
+                    cpu->fetch.btb_miss = FALSE;
+                    // If HIT, set predicition based on btb lookup -H
+                    cpu->fetch.btb_prediciton = cpu->btb[3].outcome;
                 } else {
-                  cpu->fetch.vfu = BRANCH_VFU;
-                  // Set branch flag to avoid multiple branches in the pipeline -H
-                  cpu->branch_flag = TRUE;
-
-                  // If BTB entry is valid, it results in a HIT. Otherwise results in a MISS -H
-                  if(cpu->btb[3].valid) {
-                      cpu->fetch.btb_miss = FALSE;
-                      // If HIT, set predicition based on btb lookup -H
-                      cpu->fetch.btb_prediciton = cpu->btb[3].outcome;
-                  } else {
-                      cpu->fetch.btb_miss = TRUE;
-                  }
+                    cpu->fetch.btb_miss = TRUE;
                 }
                 break;
 
             case OPCODE_JUMP:
             case OPCODE_JALR:
-            case OPCODE_RET:
-                // Check if other branches are in the pipeline and stall -H
-                printf("Branch Flag: %d\n", cpu->branch_flag);
-                if(cpu->branch_flag == TRUE) {
-                  printf("Branch exists in pipeline!\n");
-                  cpu->fetch.stall = TRUE;
-                } else {
-                  // Set branch flag to avoid multiple branches in the pipeline -H
-                  cpu->branch_flag = TRUE;
-
-                  cpu->fetch.btb_miss = TRUE;
-                  cpu->fetch.vfu = BRANCH_VFU;
-                }
-                break;
-
             case OPCODE_HALT:
-              cpu->fetch.vfu = BRANCH_VFU;
-              break;
+                cpu->fetch.btb_miss = TRUE;
+                cpu->fetch.vfu = BRANCH_VFU;
+                break;
 
         }
 
@@ -537,26 +492,80 @@ APEX_fetch(APEX_CPU *cpu)
 
         /* Update PC for next instruction */
         // If BTB Hit and predicition is taken, then change PC value to imm -H
-        if(cpu->fetch.stall == FALSE) {
-          if(cpu->fetch.btb_miss == FALSE && cpu->fetch.btb_prediciton == 1) {
-              cpu->pc = cpu->fetch.pc + cpu->fetch.imm;
-          } else {
-              printf("Hit miss\n");
-              cpu->pc += 4;
-          }
+        printf("Brnach Hit/Miss: %d\n", cpu->fetch.btb_miss);
 
-          /* Copy data from fetch latch to decode latch*/
-          cpu->decode1 = cpu->fetch;
+        if(cpu->fetch.btb_miss == FALSE && cpu->fetch.btb_prediciton == 1) {
+            cpu->pc = cpu->fetch.pc + cpu->fetch.imm;
+        } else {
+            printf("Hit miss\n");
+            cpu->pc += 4;
+        }
 
-          /* Stop fetching new instructions if HALT is fetched */
-          if (cpu->fetch.opcode == OPCODE_HALT)
-          {
-              cpu->fetch.has_insn = FALSE;
-          }
 
-          if (ENABLE_DEBUG_MESSAGES) {
-              printf("Fetch: %s\n", cpu->decode1.opcode_str);
-          }
+        /*switch(cpu->fetch.opcode) //check the BTB
+        {
+
+
+            case OPCODE_BP:
+            case OPCODE_BZ:
+            case OPCODE_BNZ:
+            case OPCODE_BNP:
+            case OPCODE_JUMP:
+
+          // In fetch, we do a quick lookup in BTB to see if it is empty, or has a corresponding/matching entry.
+          //If it does, then we check to see if the target address has been calculated. If it has, then that value will be the new PC.
+          //btb, and if it is we can take advantage of this and, given that the current PC
+          //matches that of a BTB entry's PC, we can take the calculated
+
+          //      int taken;
+          cpu->branch_predictor.branch_in_pipe_flag = TRUE;
+          if (!(cpu->branch_predictor.btb.empty())){
+            for (auto it = cpu->branch_predictor.btb.begin(); it != cpu->branch_predictor.btb.end(); it++)
+            {
+              if ((current_ins->opcode == it->opcode) && (cpu->pc == it->branch_pc))
+              {
+
+                  cpu->decode1.has_insn = FALSE;
+                  cpu->decode2.has_insn = FALSE;
+                  cpu->branch_exec.has_insn = FALSE;
+                  cpu->int_exec.has_insn = FALSE;
+                  cpu->mult_exec.has_insn = FALSE;
+                  cpu->memory.has_insn = FALSE;
+
+                  cpu->int_wb.has_insn = FALSE;
+                  cpu->branch_wb.has_insn = FALSE;
+                  cpu->mult_wb.has_insn = FALSE;
+
+                  cpu->commitment.has_insn = FALSE;
+                  cpu->fetch_from_next_cycle = TRUE;
+                  cpu->fetch.has_insn = FALSE;
+                  //given that there are entries in the BTB and one that matches the current instruction,
+                  //then if the target pc is valid, we can set that calculated PC value to be the pc.
+                  if (it->target_pc != -1) {
+
+                      cpu->pc = it->branch_pc;
+
+                    //  taken=1;
+
+
+                  }
+                  break;
+                }
+              }
+            }
+        }*/
+
+        /* Copy data from fetch latch to decode latch*/
+        cpu->decode1 = cpu->fetch;
+
+        /* Stop fetching new instructions if HALT is fetched */
+        if (cpu->fetch.opcode == OPCODE_HALT)
+        {
+            cpu->fetch.has_insn = FALSE;
+        }
+
+        if (ENABLE_DEBUG_MESSAGES) {
+            printf("Fetch: %s\n", cpu->decode1.opcode_str);
         }
     }
 }
@@ -661,17 +670,8 @@ Stall if free list isn't empty
                     }
                     break;
 
-                case OPCODE_JALR:
-                    //Free List check -J
-                   if(cpu->free_list->empty()){
-                        cpu->fetch.stall = TRUE;
-                    }
-
-                    // Default is always taken -H
-                    cpu->decode1.btb_prediciton = 1;
-                    break;
-
                 case OPCODE_JUMP:
+                case OPCODE_JALR:
                 case OPCODE_RET:
                     // Default is always taken -H
                     cpu->decode1.btb_prediciton = 1;
@@ -695,30 +695,12 @@ Stall if free list isn't empty
                         case OPCODE_JUMP:
                         case OPCODE_JALR:
                             pred_phys_reg_id = cpu->rename_table[cpu->decode1.rs1].phys_reg_id;
-                            // Check if physical reg is valid to pull, if not stall -H
-                            if (cpu->phys_regs[pred_phys_reg_id].src_bit == 0) {
-                              cpu->fetch.stall = TRUE;
-                            } else {
-                              cpu->pc = cpu->phys_regs[pred_phys_reg_id].value + cpu->decode1.imm;
-                            }
-                            
-                            printf("PHSYCIAL REG: %d\n", pred_phys_reg_id);
-                            printf("PHSYCIAL REG VALUE: %d\n", cpu->phys_regs[pred_phys_reg_id].value );
-                            printf("INFORMATION: %d\n", cpu->pc );
+                            cpu->pc = cpu->phys_regs[pred_phys_reg_id].value + cpu->decode1.imm;
                             break;
 
                         case OPCODE_RET:
                             pred_phys_reg_id = cpu->rename_table[cpu->decode1.rs1].phys_reg_id;
-                            // Check if physical reg is valid to pull, if not stall -H
-                            if (cpu->phys_regs[pred_phys_reg_id].src_bit == 0) {
-                              cpu->fetch.stall = TRUE;
-                            } else {
-                              cpu->pc = cpu->phys_regs[pred_phys_reg_id].value;
-                            }
-
-                            printf("PHSYCIAL REG: %d\n", pred_phys_reg_id);
-                            printf("PHSYCIAL REG VALUE: %d\n", cpu->phys_regs[pred_phys_reg_id].value );
-                            printf("INFORMATION: %d\n", cpu->pc );
+                            cpu->pc = cpu->phys_regs[pred_phys_reg_id].value;
                             break;
                     }
 
@@ -857,7 +839,6 @@ Rj <-- Rk <op> Rl
         //Filling out IQ entry -J
         char entry_index = index_IQ(cpu);
         cpu->iq[entry_index].status_bit = 1;
-        cpu->iq[entry_index].iq_time_padding = 0;
         cpu->iq[entry_index].fu_type = cpu->decode2.vfu;
         cpu->iq[entry_index].opcode = cpu->decode2.opcode;
         switch(cpu->decode2.opcode){//Instructions w/ literals -J
@@ -1101,7 +1082,7 @@ APEX_ISSUE_QUEUE(APEX_CPU *cpu){//Will handle grabbing the correct instructions 
     }
 
     //We have a valid instruction to issue
-    if(entry_index != 100 && cpu->iq[entry_index].iq_time_padding == 1){
+    if(entry_index != 100){
 
         // Remove entry to exetue from IQ and LSQ (if MEM operation)
         cpu->iq[entry_index].status_bit = 0;
@@ -1216,14 +1197,6 @@ APEX_ISSUE_QUEUE(APEX_CPU *cpu){//Will handle grabbing the correct instructions 
         }
     }
 }
-void IQ_cycle_advancement(APEX_CPU *cpu){
-  for(int i = 0; i < 8; i++){
-    if(cpu->iq[i].status_bit == 1){
-      cpu->iq[i].iq_time_padding = 1;
-    }
-  }
-
-}
 
 
 /*
@@ -1236,7 +1209,7 @@ APEX_execute(APEX_CPU *cpu)
 {
     //Grab instruction from issue queue
     APEX_ISSUE_QUEUE(cpu);
-    IQ_cycle_advancement(cpu);
+
     /*
         Multiplication section
     */
@@ -1573,10 +1546,6 @@ APEX_execute(APEX_CPU *cpu)
                     cpu->btb[0].valid = TRUE;
                     cpu->btb[0].outcome = cpu->branch_exec.btb_prediciton;
 
-                    // Reset branch flag and stall -H
-                    cpu->branch_flag = FALSE;
-                    cpu->fetch.stall = FALSE;
-
                     break;
                 }
 
@@ -1639,10 +1608,6 @@ APEX_execute(APEX_CPU *cpu)
                     cpu->btb[1].valid = TRUE;
                     cpu->btb[1].outcome = cpu->branch_exec.btb_prediciton;
 
-                    // Reset branch flag and stall -H
-                    cpu->branch_flag = FALSE;
-                    cpu->fetch.stall = FALSE;
-
                     break;
                 }
 
@@ -1703,10 +1668,6 @@ APEX_execute(APEX_CPU *cpu)
                     // Set branch outcome in BTB for next predicition -H
                     cpu->btb[2].valid = TRUE;
                     cpu->btb[2].outcome = cpu->branch_exec.btb_prediciton;
-
-                    // Reset branch flag and stall -H
-                    cpu->branch_flag = FALSE;
-                    cpu->fetch.stall = FALSE;
 
                     break;
                 }
@@ -1769,10 +1730,6 @@ APEX_execute(APEX_CPU *cpu)
                     cpu->btb[3].valid = TRUE;
                     cpu->btb[3].outcome = cpu->branch_exec.btb_prediciton;
 
-                    // Reset branch flag and stall -H
-                    cpu->branch_flag = FALSE;
-                    cpu->fetch.stall = FALSE;
-
                     break;
                 }
 
@@ -1780,26 +1737,19 @@ APEX_execute(APEX_CPU *cpu)
                 {
                     printf("Or I got here!\n");
                     // JALR is always taken, therefore it was taken in the decode 1 stage. However, we need to store the caclulated result in the destination register -H
-                    cpu->branch_exec.result_buffer = cpu->branch_exec.rs1_value + cpu->branch_exec.imm + 4;
+                    cpu->branch_exec.result_buffer = cpu->branch_exec.rs1_value + cpu->branch_exec.imm;
 
-                  
-                    printf("RS1 REG VALUE: %d\n", cpu->branch_exec.rs1_value  );
-                    printf("RESULT: %d\n", cpu->branch_exec.result_buffer);
-
-                    // Reset branch flag and stall -H
-                    cpu->branch_flag = FALSE;
-                    cpu->fetch.stall = FALSE;
-                    break;
-
+                    /*Calculate address by adding src1 and immediate and saves the return
+                    address (next instr under jalr) at the same time */
+                      //cpu->branch_exec.result_buffer = cpu->branch_exec.rs1_value + cpu->branch_exec.imm;
+                      //cpu->branch_exec.inc_address_buffer = cpu->branch_exec.memory_address + 4; //add 4 to obtain the NEXT INSTRUCTION ADDRESS -C
+                      break;
                 }
 
                 // JUMP/RET is always taken, therefore it was taken in the decode 1 stage and no action is required -H
                 case OPCODE_JUMP:
                 case OPCODE_RET:
                 case OPCODE_HALT:
-                  // Reset branch flag and stall -H
-                  cpu->branch_flag = FALSE;
-                  cpu->fetch.stall = FALSE;
                   break;
         }
 
@@ -2147,7 +2097,6 @@ APEX_cpu_init(const char *filename)
     for(i = 0; i < 8; i++){
         IQ_Entry iq_entry;
         iq_entry.status_bit = 0;
-        iq_entry.iq_time_padding = 0;
         iq_entry.src1_tag = -1;
         iq_entry.src2_tag = -1;
         iq_entry.src1_rdy_bit = 0;
@@ -2162,8 +2111,6 @@ APEX_cpu_init(const char *filename)
     for (i = 0; i < 4; i++) {
         cpu->btb[i].valid = FALSE;
     }
-    // Initialize branch flag to false -H
-    cpu->branch_flag = FALSE;
 
     return cpu;
 }
@@ -2209,10 +2156,10 @@ APEX_cpu_run(APEX_CPU *cpu)
         APEX_decode2(cpu);
         APEX_decode1(cpu);
         APEX_fetch(cpu);
-      print_reg_file(cpu);
+      /*  print_reg_file(cpu);
         print_phys_reg_file(cpu);
-        print_rename_table(cpu);
-      // print_memory(cpu);
+        print_rename_table(cpu);*/
+      //  print_memory(cpu);
         printf("\n\n\n\n");
 
         if (cpu->single_step)
