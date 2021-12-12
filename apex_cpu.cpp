@@ -246,6 +246,15 @@ print_lsq(APEX_CPU *cpu)
 
 }
 
+static void
+print_btb(APEX_CPU *cpu)
+{
+//  for (auto it = cpu->branch_predictor.btb.begin(); it != cpu->branch_predictor.btb.end(); it++)
+  //{
+
+  //}
+}
+
 /*
  * Fetch Stage of APEX Pipeline
  *
@@ -2119,6 +2128,9 @@ APEX_command(APEX_CPU *cpu, std::string  user_in)
       }
       else if (s1 == "SHOWROB"){
         print_rob(cpu);
+      }
+      else if (s1 == "SHOWBTB") {
+
       }
       else if(s1 == "STARTOVER") {
 
