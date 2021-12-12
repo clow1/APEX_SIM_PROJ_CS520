@@ -102,6 +102,8 @@ typedef struct IQ_Entry
   int pc_value; //For tiebreaking -J
   // We need the prediction in the exe stage for branches -H
   int btb_prediciton; // This will store the predicition to take / NOT take branch -H
+
+  int iq_time_padding; //Make it wait a cycle before getting grabbed -J
 }IQ_Entry;
 
 

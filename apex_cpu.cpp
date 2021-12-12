@@ -803,6 +803,7 @@ Rj <-- Rk <op> Rl
         //Filling out IQ entry -J
         char entry_index = index_IQ(cpu);
         cpu->iq[entry_index].status_bit = 1;
+        cpu->iq[entry_index].iq_time_padding = 0;
         cpu->iq[entry_index].fu_type = cpu->decode2.vfu;
         cpu->iq[entry_index].opcode = cpu->decode2.opcode;
         switch(cpu->decode2.opcode){//Instructions w/ literals -J
@@ -1046,7 +1047,7 @@ APEX_ISSUE_QUEUE(APEX_CPU *cpu){//Will handle grabbing the correct instructions 
     }
 
     //We have a valid instruction to issue
-    if(entry_index != 100){
+    if(entry_index != 100 && cpu->iq[entry_index].iq_time_padding == 1){
 
         // Remove entry to exetue from IQ and LSQ (if MEM operation)
         cpu->iq[entry_index].status_bit = 0;
@@ -1161,6 +1162,14 @@ APEX_ISSUE_QUEUE(APEX_CPU *cpu){//Will handle grabbing the correct instructions 
         }
     }
 }
+void IQ_cycle_advancement(APEX_CPU *cpu){
+  for(int i = 0; i < 8; i++){
+    if(cpu->iq[i].status_bit == 1){
+      cpu->iq[i].iq_time_padding = 1;
+    }
+  }
+
+}
 
 
 /*
@@ -1173,7 +1182,7 @@ APEX_execute(APEX_CPU *cpu)
 {
     //Grab instruction from issue queue
     APEX_ISSUE_QUEUE(cpu);
-
+    IQ_cycle_advancement(cpu);
     /*
         Multiplication section
     */
@@ -2084,6 +2093,7 @@ APEX_cpu_init(const char *filename)
     for(i = 0; i < 8; i++){
         IQ_Entry iq_entry;
         iq_entry.status_bit = 0;
+        iq_entry.iq_time_padding = 0;
         iq_entry.src1_tag = -1;
         iq_entry.src2_tag = -1;
         iq_entry.src1_rdy_bit = 0;
