@@ -2255,6 +2255,8 @@ APEX_command(APEX_CPU *cpu, std::string  user_in)
       }
       else if (s1 == "SHOWLSQ") {
         print_lsq(cpu);
+      } else if (s1 == "STOP") {
+        exit(0);
       }
       else if(s1 == "STARTOVER") {
 
