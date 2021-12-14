@@ -910,7 +910,6 @@ APEX_ISSUE_QUEUE(APEX_CPU *cpu){//Will handle grabbing the correct instructions 
                     if(cpu->phys_regs[cpu->iq[i].src1_tag].src_bit && cpu->phys_regs[cpu->iq[i].src2_tag].src_bit){
                         if(cpu->iq[i].fu_type == INT_VFU){
                             if(cpu->int_exec.stall == TRUE){
-                                entry_index = 100;
                                 break;
                             }
                         }
@@ -932,7 +931,6 @@ APEX_ISSUE_QUEUE(APEX_CPU *cpu){//Will handle grabbing the correct instructions 
                     if(cpu->phys_regs[cpu->iq[i].src1_tag].src_bit){
                         if(cpu->iq[i].fu_type == INT_VFU){
                             if(cpu->int_exec.stall == TRUE){
-                                entry_index = 100;
                                 break;
                             }
                         }
@@ -954,7 +952,6 @@ APEX_ISSUE_QUEUE(APEX_CPU *cpu){//Will handle grabbing the correct instructions 
                 case OPCODE_HALT:
                     if(cpu->iq[i].fu_type == INT_VFU){
                         if(cpu->int_exec.stall == TRUE){
-                            entry_index = 100;
                             break;
                         }
                     }
