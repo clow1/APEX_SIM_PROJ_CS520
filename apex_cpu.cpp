@@ -894,6 +894,8 @@ APEX_ISSUE_QUEUE(APEX_CPU *cpu){//Will handle grabbing the correct instructions 
     int entry_index = 100;
     for(int i = 0; i < 8; i++){
         if(cpu->iq[i].status_bit == 1 && free_VFU(cpu, cpu->iq[i].fu_type)){//Now check and see if the src_bits are valid (but diff instr wait on diff srcs) -J
+
+
             switch(cpu->iq[i].opcode){
                 //First look at instr w/ src1 & src2
                 case OPCODE_ADD:
@@ -906,7 +908,12 @@ APEX_ISSUE_QUEUE(APEX_CPU *cpu){//Will handle grabbing the correct instructions 
                 case OPCODE_CMP:
                     // Check if the physical register is valid for both source registers
                     if(cpu->phys_regs[cpu->iq[i].src1_tag].src_bit && cpu->phys_regs[cpu->iq[i].src2_tag].src_bit){
-
+                        if(cpu->iq[i].fu_type == INT_VFU){
+                            if(cpu->int_exec.stall == TRUE){
+                                entry_index = 100;
+                                break;
+                            }
+                        }
                         if(entry_index == 100){
                             entry_index = i;
                         }else{
@@ -923,6 +930,12 @@ APEX_ISSUE_QUEUE(APEX_CPU *cpu){//Will handle grabbing the correct instructions 
                 case OPCODE_RET: //Added this since it has only src1 -C
                 case OPCODE_JALR:
                     if(cpu->phys_regs[cpu->iq[i].src1_tag].src_bit){
+                        if(cpu->iq[i].fu_type == INT_VFU){
+                            if(cpu->int_exec.stall == TRUE){
+                                entry_index = 100;
+                                break;
+                            }
+                        }
                         if(entry_index == 100){
                             entry_index = i;
                         }else{
@@ -939,6 +952,12 @@ APEX_ISSUE_QUEUE(APEX_CPU *cpu){//Will handle grabbing the correct instructions 
                 case OPCODE_BNZ:
                 case OPCODE_NOP:
                 case OPCODE_HALT:
+                    if(cpu->iq[i].fu_type == INT_VFU){
+                        if(cpu->int_exec.stall == TRUE){
+                            entry_index = 100;
+                            break;
+                        }
+                    }
                     if(entry_index == 100){
                         entry_index = i;
                     }else{
@@ -1024,6 +1043,11 @@ APEX_ISSUE_QUEUE(APEX_CPU *cpu){//Will handle grabbing the correct instructions 
                     //Nothing -J
                     case OPCODE_NOP:
                         break;
+                }
+                switch(issuing_instr.opcode){
+                    case OPCODE_LOAD:
+                    case OPCODE_STORE:
+                        cpu->int_exec.stage_delay = 1;
                 }
                 break;
 
@@ -1132,6 +1156,7 @@ APEX_execute(APEX_CPU *cpu)
 
     if(cpu->int_exec.has_insn == TRUE && cpu->int_exec.stall != TRUE){
         int mem_instruction = FALSE;
+
 
         switch (cpu->int_exec.opcode){
             case OPCODE_ADD:
@@ -1344,7 +1369,9 @@ APEX_execute(APEX_CPU *cpu)
             } else {
                 // If there is no instruction currently in the mem stage advance current instruction to next stage -H
                 cpu->memory = cpu->int_exec; //Memory has its own stage
+                cpu->memory.stage_delay = 1;
                 cpu->int_exec.has_insn = FALSE;
+                cpu->int_exec.stall = TRUE;
             }
         } else{
             cpu->int_wb = cpu->int_exec;
@@ -1669,13 +1696,13 @@ APEX_memory(APEX_CPU *cpu)
                 }
             }
 
-            // The mem instruction is complete, check if another mem operation is being stalled in exe stage -H
-            if(cpu->int_exec.stall == TRUE) {
-                cpu->int_exec.stall = FALSE;
-            }
+            cpu->int_exec.stall = FALSE;
 
         }else{
             cpu->memory.stage_delay++;
+            // The mem instruction is complete, check if another mem operation is being stalled in exe stage -H
+                cpu->int_exec.stall = TRUE;
+
         }
 
     }
