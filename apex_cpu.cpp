@@ -30,67 +30,70 @@ get_code_memory_index_from_pc(const int pc)
  *
  * Note: You are not supposed to edit this function
  */
-static void
-print_reg_file(const APEX_CPU *cpu)
-{
-    //int i;
+ static void
+ print_reg_file(const APEX_CPU *cpu)
+ {
+     //int i;
 
-    printf("\n----------\n%s\n----------\n", "Architecture Registers:");
+     printf("\n----------\n%s\n----------\n", "Architecture Registers:");
 
-    for (int i = 0; i < REG_FILE_SIZE / 2; ++i)
-    {
+     for (int i = 0; i < REG_FILE_SIZE / 2; ++i)
+     {
 
-      if (cpu->arch_regs[i].value == 0) {
-        printf("R%-3d[X] ",i);
-      } else {
-            printf("R%-3d[%-3d] ", i, cpu->arch_regs[i]);
-      }
+       if (cpu->arch_regs[i].value == 0 && cpu->arch_regs[i].src_bit == 0) {
+         printf("R%-3d[X] ",i);
+       } else {
+             printf("R%-3d[%-3d] ", i, cpu->arch_regs[i]);
+       }
 
-    }
+     }
 
-    printf("\n");
+     printf("\n");
 
-    for (int i = (REG_FILE_SIZE / 2); i < REG_FILE_SIZE; ++i)
-    {
-      if (cpu->arch_regs[i].value == 0) {
-        printf("R%-3d[X] ",i);
-      } else {
-            printf("R%-3d[%-3d] ", i, cpu->arch_regs[i]);
-      }
-    }
+     for (int i = (REG_FILE_SIZE / 2); i < REG_FILE_SIZE; ++i)
+     {
+       if (cpu->arch_regs[i].value == 0 && cpu->arch_regs[i].src_bit == 0) {
+         printf("R%-3d[X] ",i);
+       } else {
+             printf("R%-3d[%-3d] ", i, cpu->arch_regs[i]);
+       }
+     }
 
-    printf("\n");
-}
+     printf("\n");
+ }
 
-static void
-print_phys_reg_file(const APEX_CPU *cpu)
-{
-    //int i;
+ static void
+ print_phys_reg_file(const APEX_CPU *cpu)
+ {
+     //int i;
 
-    printf("\n----------\n%s\n----------\n", "Physical Registers:");
+     printf("\n----------\n%s\n----------\n", "Physical Registers:");
 
-    for (int i = 0; i < 20 / 2; ++i)
-    {
-      if (cpu->phys_regs[i].value == 0) {
-        printf("R%-3d[X] ",i);
-      } else {
-            printf("R%-3d[%-3d] ", i, cpu->phys_regs[i]);
-      }
-    }
+     for (int i = 0; i < 20 / 2; ++i)
+     {
+       if (cpu->phys_regs[i].value == 0 &&
+         cpu->phys_regs[i].src_bit == 0) {
+         printf("R%-3d[X] ",i);
+       } else {
+             printf("R%-3d[%-3d] ", i, cpu->phys_regs[i]);
+       }
+     }
 
-    printf("\n");
+     printf("\n");
 
-    for (int i = (20 / 2); i < 20; ++i)
-    {
-      if (cpu->phys_regs[i].value == 0) {
-        printf("R%-3d[X] ",i);
-      } else {
-            printf("R%-3d[%-3d] ", i, cpu->phys_regs[i]);
-      }
-    }
+     for (int i = (20 / 2); i < 20; ++i)
+     {
+       if (cpu->phys_regs[i].value == 0
+         && cpu->phys_regs[i].src_bit == 0) {
+         printf("R%-3d[X] ",i);
+       } else {
+             printf("R%-3d[%-3d] ", i, cpu->phys_regs[i]);
+       }
+     }
 
-    printf("\n");
-}
+     printf("\n");
+ }
+
 
 static void
 print_rename_table(const APEX_CPU *cpu)
@@ -142,39 +145,42 @@ print_iq(const APEX_CPU *cpu)
   for (int i = 0; i < 8; i++)
   {
     printf("ENTRY %d || ", i);
-      if (cpu->iq[i].status_bit == INVALID && cpu->iq[i].fu_type <=0) {
+      if ((cpu->iq[i].status_bit!= 0 || cpu->iq[i].status_bit != 1)
+         && (cpu->iq[i].fu_type <0 || cpu->iq[i].fu_type > 3)) {
         printf("XX, ");
         printf("XX, ");
       } else {
           printf("%d, ", cpu->iq[i].status_bit);
+
           printf("%d, ", cpu->iq[i].fu_type);
       }
 
-      if (cpu->iq[i].src1_rdy_bit == NOT_READY &&
-        cpu->iq[i].fu_type <=0)
+      if ((cpu->iq[i].src1_rdy_bit != 1 || cpu->iq[i].src1_rdy_bit != 0) &&
+        (cpu->iq[i].fu_type <0 || cpu->iq[i].fu_type > 3))
       {
         printf("XX, ");
       } else printf("%d, ", cpu->iq[i].src1_rdy_bit);
 
-      if ((cpu->iq[i].src1_rdy_bit == NOT_READY ||
-        cpu->iq[i].src1_tag ==-1 ))
+      if ((cpu->iq[i].src1_rdy_bit != 0 || cpu->iq[i].src1_rdy_bit != 1) &&
+        (cpu->iq[i].src1_tag == -1 ))
       {
         printf("XX, "); //tag
         printf("XX, "); //val
+
       }else {
         printf("%d, ", cpu->iq[i].src1_tag);
         printf("%d, ", cpu->iq[i].src1_val);
       }
 
-      if (cpu->iq[i].src2_rdy_bit == NOT_READY &&
-        cpu->iq[i].fu_type <=0)
+      if ((cpu->iq[i].src2_rdy_bit != 1 || cpu->iq[i].src2_rdy_bit != 0) &&
+      ( cpu->iq[i].fu_type <0) || cpu->iq[i].fu_type > 3)
         {
         printf("XX, ");
 
       } else printf("%d, ", cpu->iq[i].src2_rdy_bit);
 
-        if ((cpu->iq[i].src2_rdy_bit == NOT_READY ||
-          cpu->iq[i].src2_tag ==-1 ))
+        if ((cpu->iq[i].src2_rdy_bit != 0 || cpu->iq[i].src2_rdy_bit!=1) &&
+          cpu->iq[i].src2_tag ==-1 )
         {
             printf("XX, "); //tag
             printf("XX, "); //val
@@ -190,66 +196,9 @@ print_iq(const APEX_CPU *cpu)
 
   }
 
-
-
-
       printf("\n");
-
-
-    /**
-      printf("ENTRY %d || ", i);
-        if (cpu->iq[i].status_bit == INVALID) {
-          printf("XX, ");
-        } else printf("%d, ", cpu->iq[i].status_bit);
-
-        if  (cpu->iq[i].status_bit == INVALID || cpu->iq[i].status_bit < 0 ||
-          cpu->iq[i].status_bit > 3)
-        {
-          printf("XX, ");
-        } else printf("%d, ", cpu->iq[i].fu_type);
-
-        if (cpu->iq[i].src1_rdy_bit == NOT_READY)
-        {
-          printf("XX, ");
-        } else printf("%d, ", cpu->iq[i].src1_rdy_bit);
-
-        if (cpu->iq[i].src1_tag == INVALID ||
-          cpu->iq[i].src1_tag < 0)
-        {
-          printf("XX, ");
-        }else printf("%d, ", cpu->iq[i].src1_tag);
-
-        if (cpu->iq[i].src1_rdy_bit == NOT_READY ||
-          cpu->iq[i].src1_rdy_bit < 0)
-        {
-          printf("XX, ");
-        } else printf("%d, ", cpu->iq[i].src1_val);
-
-        if (cpu->iq[i].src2_rdy_bit == NOT_READY ||
-          cpu->iq[i].src2_rdy_bit < 0)
-        {
-          printf("XX, ");
-        } else printf("%d, ", cpu->iq[i].src2_rdy_bit);
-
-        if (cpu->iq[i].src2_tag == INVALID ||
-          cpu->iq[i].src2_tag < 0) {
-          printf("XX, ");
-        } else printf("%d, ", cpu->iq[i].src2_tag);
-
-        if (cpu->iq[i].src2_rdy_bit == NOT_READY ||
-          cpu->iq[i].src2_rdy_bit < 0) {
-          printf("XX, ");
-        } else printf("%d, ", cpu->iq[i].src2_val);
-
-        if (cpu->iq[i].dest == INVALID) {
-          printf("XX ");
-        } else printf("%d ", cpu->iq[i].dest);
-        printf("\n");
-        **/
-
-
-
 }
+
 
 static void
 print_rob(const APEX_CPU *cpu)
@@ -279,7 +228,7 @@ print_rob(const APEX_CPU *cpu)
         case OPCODE_MOVC:
         case OPCODE_MUL:
         case OPCODE_DIV:
-            if (it->status_bit == VALID)
+            if (it->status_bit == 1)
             printf("%d, ", it->result);
             else printf("XX, ");
             break;
@@ -288,7 +237,7 @@ print_rob(const APEX_CPU *cpu)
           break;
       }
 
-      if (it->status_bit == NOT_READY) printf("XX, ");
+      if (it->status_bit != 0 && it->status_bit !=1) printf("XX, ");
       else printf("%d, ", it->status_bit);
 
       if (it->itype == INVALID) {
@@ -300,6 +249,8 @@ print_rob(const APEX_CPU *cpu)
       printf("\n");
     }
 }
+
+
 static void
 print_lsq(APEX_CPU *cpu)
 {
