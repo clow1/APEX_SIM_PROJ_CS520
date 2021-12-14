@@ -124,10 +124,8 @@ print_mem(const APEX_CPU *cpu, int start_addr, int end_addr)
 {
     printf("\n----------\n%s\n----------\n", "Memory:");
 
-    for (int i=start_addr; i < DATA_MEMORY_SIZE/cpu->code_memory_size; i+=2){
+    for (int i=start_addr; i <= end_addr; i++){
   //    printf("cpu->data_memory[i]: %d \n", get_code_memory_index_from_pc(cpu->pc));
-      if (i == end_addr+2) break;
-
         printf("| MEM[%d]  \t| Data Value = %d \t|\n", i, cpu->data_memory[i] );
 
 
