@@ -259,7 +259,8 @@ print_lsq(APEX_CPU *cpu)
   for (int i = 0; i < cpu->lsq->size(); i++) {
 
       printf("ENTRY %d || ", i);
-        if (cpu->iq[i].status_bit == INVALID && cpu->iq[i].fu_type <=0) {
+        if (cpu->iq[i].status_bit != 0 || cpu->iq[i].status_bit != 1 &&
+          (cpu->iq[i].fu_type <0) || (cpu->iq[i].fu_type > 3)) {
           printf("XX, ");
           printf("XX, ");
         } else {
@@ -1882,7 +1883,6 @@ APEX_cpu_init(const char *filename)
         free(cpu);
         return NULL;
     }
-    cpu->single_step = 1;
     if (ENABLE_DEBUG_MESSAGES)
     {
         fprintf(stderr,
