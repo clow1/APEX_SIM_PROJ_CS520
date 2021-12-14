@@ -248,8 +248,8 @@ create_APEX_instruction(APEX_Instruction *ins, char *buffer)
         //src1 src2 literal
         case OPCODE_STORE:
         {
-            ins->rs2 = get_num_from_string(tokens[0]);
-            ins->rs1 = get_num_from_string(tokens[1]);
+            ins->rs1 = get_num_from_string(tokens[0]);
+            ins->rs2 = get_num_from_string(tokens[1]);
             ins->imm = get_num_from_string(tokens[2]);
             break;
         }
