@@ -1960,6 +1960,7 @@ APEX_cpu_run(APEX_CPU *cpu)
 {
 
     char user_prompt_val;
+    std::string user_val;
     /*Cycles_wanted = -1 means single_step
      * mem_address_wanted != -1 means show_mem
      * Otherwise it is display or simulate
@@ -1993,18 +1994,36 @@ APEX_cpu_run(APEX_CPU *cpu)
         if (cpu->single_step)
         {
             printf("Press any key to advance CPU Clock or <q> to quit:\n");
-            scanf("%c", &user_prompt_val);
+            //scanf("%c", &user_prompt_val);
+            //std::cin >> user_val;
+            getline(std::cin, user_val);
+            std::stringstream s(user_val);
 
-            if ((user_prompt_val == 'Q') || (user_prompt_val == 'q'))
+            if ((user_val == "Q") || (user_val == "q"))
             {
                 printf("APEX_CPU: Simulation Stopped, cycles = %d instructions = %d\n", cpu->clock, cpu->insn_completed);
                 break;
-            }
+
+            } else {
+
+              //IF THE USER_VAL DOESN'T MAP TO A VALID COMMAND, IT WILL JUST IGNORE THIS
+              APEX_command(cpu, user_val);
+            } /*else if (user_val == "SHOWREGS" || user_val == "SHOWIQ" ||
+            user_val == "SHOWROB" || user_val == "SHOWMEM" || user_val == "SHOWBTB" ||
+          user_val == "STOP" || user_val == "SHOWRNT" || user_val == "RUN" || (s >> user_val) ) {
+              //printf("HEY");
+              cpu->command = user_val;
+              APEX_command(cpu, cpu->command);
+
+            }*/
+
+        } else {
+            APEX_command(cpu,cpu->command);
         }
 
 
 
-        APEX_command(cpu,cpu->command);
+
         cpu->clock++;
     }
 }
@@ -2061,6 +2080,8 @@ APEX_command(APEX_CPU *cpu, std::string  user_in)
       }
       else if (s1 == "SHOWLSQ") {
         print_lsq(cpu);
+      } else if (s1 == "STEP") {
+        cpu->single_step = 1;
       }
       else if (s1 == "STOP")
       {
@@ -2075,7 +2096,7 @@ APEX_command(APEX_CPU *cpu, std::string  user_in)
       }
 
     }
-    if (tok.size() == 2) {
+    else if (tok.size() == 2) {
         std::string s1 = tok.at(0);
 
       if (s1 == "RUN")
@@ -2084,7 +2105,7 @@ APEX_command(APEX_CPU *cpu, std::string  user_in)
         }
     }
 
-    if (tok.size() == 3) {
+    else if (tok.size() == 3) {
       std::string s1 = tok.at(0);
       std::string s2 = tok.at(1);
       std::string s3 = tok.at(2);
