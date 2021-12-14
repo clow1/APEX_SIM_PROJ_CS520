@@ -466,7 +466,7 @@ APEX_fetch(APEX_CPU *cpu)
         } else {
             cpu->pc += 4;
         }
-
+        printf("Fetch:%d\n", cpu->fetch.opcode);
         /* Copy data from fetch latch to decode latch*/
         cpu->decode1 = cpu->fetch;
 
@@ -475,7 +475,7 @@ APEX_fetch(APEX_CPU *cpu)
         {
             cpu->fetch.has_insn = FALSE;
         }
-    }
+    } else printf("Fetch:\n");
 }
 
 static char available_ROB(APEX_CPU* cpu){
@@ -616,13 +616,13 @@ Stall if free list isn't empty
                     cpu->fetch_from_next_cycle = TRUE;
                     cpu->fetch.has_insn = TRUE;
                 }
-
+                printf("Decode1: %d\n", cpu->decode1.opcode);
                 cpu->decode2 = cpu->decode1;
                 cpu->decode1.has_insn = FALSE;
                 cpu->fetch.stall = FALSE;
             }
         }
-    }
+    } else printf("Decode1:\n");
 
 }
 
@@ -811,10 +811,11 @@ Rj <-- Rk <op> Rl
                 cpu->lsq->push(cpu->iq[entry_index]);
                 break;
         }
-
+           printf("Decode2: %d\n", cpu->decode2.opcode);
         cpu->decode2.has_insn = FALSE;
         //We don't forward data in pipeline to exec right away like before bc IQ is Out-of-Order -J
-    }
+    } else printf("Decode2:\n");
+
 }
 
 static int check_LSQ(APEX_CPU* cpu, int entry_index){
@@ -1114,6 +1115,7 @@ APEX_execute(APEX_CPU *cpu)
         Multiplication section
     */
     if(cpu->mult_exec.has_insn == TRUE){
+        printf("Mult Exec: %d\n", cpu->mult_exec.opcode);
         if(cpu->mult_exec.stage_delay > 2){
             switch (cpu->mult_exec.opcode){
                 case OPCODE_MUL:
@@ -1144,7 +1146,7 @@ APEX_execute(APEX_CPU *cpu)
             cpu->mult_exec.stage_delay++;
         }
 
-    }
+    } else printf("Mult Int:\n");
 
     /*
         Integer section
@@ -1154,7 +1156,7 @@ APEX_execute(APEX_CPU *cpu)
     if(cpu->int_exec.has_insn == TRUE && cpu->int_exec.stall != TRUE){
         int mem_instruction = FALSE;
 
-
+        printf("Int Exec: %d\n", cpu->int_exec.opcode);
         switch (cpu->int_exec.opcode){
             case OPCODE_ADD:
             {
@@ -1375,11 +1377,12 @@ APEX_execute(APEX_CPU *cpu)
             cpu->int_exec.has_insn = FALSE;
         }
 
-    }
+    } else printf("Int Exec:\n");
     /*
         Branch section -H
     */
     if(cpu->branch_exec.has_insn == TRUE){
+          printf("Branch Exec:%d\n",cpu->branch_exec.opcode);
             switch(cpu->branch_exec.opcode){
               case OPCODE_BZ:
                 {
@@ -1644,7 +1647,7 @@ APEX_execute(APEX_CPU *cpu)
         cpu->branch_wb = cpu->branch_exec;
         cpu->branch_exec.has_insn = FALSE;
 
-    }
+    } else printf("Branch Exec:\n");
 
 
 
@@ -1661,6 +1664,7 @@ APEX_memory(APEX_CPU *cpu)
 {
     if (cpu->memory.has_insn == TRUE)
     {
+      printf("Memory:%d\n", cpu->memory.opcode);
         if(cpu->memory.stage_delay > 1){
 
             switch (cpu->memory.opcode)
@@ -1696,13 +1700,14 @@ APEX_memory(APEX_CPU *cpu)
             cpu->int_exec.stall = FALSE;
 
         }else{
+
             cpu->memory.stage_delay++;
             // The mem instruction is complete, check if another mem operation is being stalled in exe stage -H
                 cpu->int_exec.stall = TRUE;
 
         }
 
-    }
+    } else   printf("Memory:\n");
 }
 
 /*
@@ -1782,13 +1787,16 @@ APEX_writeback(APEX_CPU *cpu)
         APEX_forward(cpu, cpu->mult_wb);
         cpu->rename_table[CC_INDEX].phys_reg_id = cpu->mult_wb.rd;
         cpu->mult_wb.has_insn = FALSE;
-    }
+        printf("Mult WB: %d\n", cpu->mult_wb.opcode);
+
+    } else printf("Mult WB:\n");
     // Int operations writeback stage -H
     if(cpu->int_wb.has_insn == TRUE){
         APEX_forward(cpu, cpu->int_wb);
         cpu->rename_table[CC_INDEX].phys_reg_id = cpu->mult_wb.rd;
         cpu->int_wb.has_insn = FALSE;
-    }
+        printf("Int WB: %d\n", cpu->int_wb.opcode);
+    } else printf("Int WB:\n");
     if(cpu->mem_wb.has_insn == TRUE){
         APEX_forward(cpu, cpu->mem_wb);
         switch(cpu->mem_wb.opcode){
@@ -1811,9 +1819,11 @@ APEX_writeback(APEX_CPU *cpu)
                 cpu->fetch.stall = FALSE;
                 break;
         }
+          printf("Branch WB: %d \n", cpu->branch_wb.opcode);
 
         cpu->branch_wb.has_insn = FALSE;
-    }
+    } else printf("Branch WB:\n");
+
 
     /* Default */
     return;
@@ -1854,10 +1864,11 @@ APEX_commitment(APEX_CPU* cpu){
 
             cpu->insn_completed++;
 
-            if (ENABLE_DEBUG_MESSAGES) {
-                printf("Commit: ");
-            }
+
         }
+    }
+    if (ENABLE_DEBUG_MESSAGES) {
+    std::cout<<"Commit: " << cpu->commitment.opcode_str << std::endl;
     }
     return 0;
 }
@@ -2113,6 +2124,23 @@ APEX_command(APEX_CPU *cpu, std::string  user_in)
       }
       else if(s1 == "STARTOVER") {
 
+        cpu->fetch.has_insn = false;
+        cpu->decode1.has_insn = false;
+        cpu->decode2.has_insn = false;
+        cpu->int_exec.has_insn = false;
+        cpu->mult_exec.has_insn = false;
+        cpu->branch_exec.has_insn = false;
+        cpu->memory.has_insn = false;
+        cpu->mem_wb.has_insn = false;
+        cpu->int_wb.has_insn = false;
+        cpu->mult_wb.has_insn = false;
+        cpu->branch_wb.has_insn = false;
+        cpu->commitment.has_insn = false;
+        cpu->clock = 0;
+        cpu->pc = 4000;
+        cpu->fetch_from_next_cycle = TRUE;
+
+        return;
         //cpu = APEX_cpu_init();
       //  cpu->pc = 4000;
       //  cpu->clock = 1;
