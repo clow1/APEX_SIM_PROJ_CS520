@@ -867,12 +867,11 @@ static int check_LSQ(APEX_CPU* cpu, int entry_index){
 
 static int tiebreaker_IQ(APEX_CPU* cpu, int a, int b){//The lower PC value is the earlier instruction (which in case of tie is issued first) -J
     //If MEM operation, check the LSQ
-    /*if(a != 100 && cpu->iq[a].lsq_id != -1){
-        a = check_LSQ(cpu, a);
+    if(a == 100 && b != 100){
+        return b;
+    }else if(a != 100 && b == 100){
+        return a;
     }
-    if(b != 100 && cpu->iq[b].lsq_id != -1){
-        b = check_LSQ(cpu, b);
-    }*/
     return (cpu->iq[a].pc_value < cpu->iq[b].pc_value) ? a : b;
 }
 
