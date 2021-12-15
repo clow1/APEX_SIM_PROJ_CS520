@@ -904,7 +904,7 @@ static void
 APEX_ISSUE_QUEUE(APEX_CPU *cpu){//Will handle grabbing the correct instructions in the IQ for Exec stage -J
     //I want to make it so there's a comparison between entry
 
-  print_iq(cpu);
+  //print_iq(cpu);
 
     int entry_index = 100;
     for(int i = 0; i < 8; i++){
@@ -981,7 +981,7 @@ APEX_ISSUE_QUEUE(APEX_CPU *cpu){//Will handle grabbing the correct instructions 
         }
     }
 
-    printf("AAAAAAAA %d\n", entry_index);
+   // printf("AAAAAAAA %d\n", entry_index);
 
     //We have a valid instruction to issue
     //&& cpu->iq[entry_index].iq_time_padding == 1
@@ -2048,11 +2048,11 @@ APEX_cpu_run(APEX_CPU *cpu)
         APEX_decode2(cpu);
         APEX_decode1(cpu);
         APEX_fetch(cpu);
-       print_reg_file(cpu);
+       //print_reg_file(cpu);
         //print_phys_reg_file(cpu);
         //print_rename_table(cpu);
-      print_memory(cpu);
-        printf("\n\n\n\n");
+      //print_memory(cpu);
+       // printf("\n\n\n\n");
 
         if (cpu->single_step)
         {
