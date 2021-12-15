@@ -115,7 +115,7 @@ print_memory(const APEX_CPU *cpu)
 {
     printf("\n----------\n%s\n----------\n", "Memory:");
 
-    for (int i=0; i < DATA_MEMORY_SIZE/cpu->code_memory_size; i+=2){
+    for (int i=0; i < 40; i+=2){
         printf("| MEM[%d]  \t| Data Value = %d \t|\n", i, cpu->data_memory[i] );
     }
     printf("\n");
@@ -145,6 +145,7 @@ print_iq(const APEX_CPU *cpu)
   for (int i = 0; i < 8; i++)
   {
     printf("ENTRY %d || ", i);
+    printf("   %d    \n", cpu->iq[i].opcode );
       if ((cpu->iq[i].status_bit!= 0 || cpu->iq[i].status_bit != 1)
          && (cpu->iq[i].fu_type <0 || cpu->iq[i].fu_type > 3)) {
         printf("XX, ");
@@ -379,6 +380,7 @@ APEX_fetch(APEX_CPU *cpu)
             case OPCODE_LOAD:
             case OPCODE_STORE:
             case OPCODE_NOP:
+            case OPCODE_CMP:
                 cpu->fetch.vfu = INT_VFU;
                 break;
 
@@ -466,7 +468,7 @@ APEX_fetch(APEX_CPU *cpu)
         } else {
             cpu->pc += 4;
         }
-        printf("Fetch:%d\n", cpu->fetch.opcode);
+        printf("Fetch: %d\n", cpu->fetch.opcode);
         /* Copy data from fetch latch to decode latch*/
         cpu->decode1 = cpu->fetch;
 
@@ -543,6 +545,7 @@ Stall if free list isn't empty
                 case OPCODE_AND:
                 case OPCODE_OR:
                 case OPCODE_EXOR:
+                case OPCODE_CMP:
                     //Free List check -J
                    if(cpu->free_list->empty()){
                         cpu->fetch.stall = TRUE;
@@ -572,6 +575,11 @@ Stall if free list isn't empty
                 case OPCODE_BNZ:
                 case OPCODE_BP:
                 case OPCODE_BNP:
+                    //Free List check -J
+                   if(cpu->free_list->empty()){
+                        cpu->fetch.stall = TRUE;
+
+                    }
                     // If btb miss, set default predicition of Taken -H
                     if(cpu->decode1.btb_miss == TRUE){
                         cpu->decode1.btb_prediciton = 1;
@@ -581,6 +589,11 @@ Stall if free list isn't empty
                 case OPCODE_JUMP:
                 case OPCODE_JALR:
                 case OPCODE_RET:
+                    //Free List check -J
+                   if(cpu->free_list->empty()){
+                        cpu->fetch.stall = TRUE;
+
+                    }
                     // Default is always taken -H
                     cpu->decode1.btb_prediciton = 1;
                     break;
@@ -854,12 +867,12 @@ static int check_LSQ(APEX_CPU* cpu, int entry_index){
 
 static int tiebreaker_IQ(APEX_CPU* cpu, int a, int b){//The lower PC value is the earlier instruction (which in case of tie is issued first) -J
     //If MEM operation, check the LSQ
-    if(a != 100 && cpu->iq[a].lsq_id != -1){
+    /*if(a != 100 && cpu->iq[a].lsq_id != -1){
         a = check_LSQ(cpu, a);
     }
     if(b != 100 && cpu->iq[b].lsq_id != -1){
         b = check_LSQ(cpu, b);
-    }
+    }*/
     return (cpu->iq[a].pc_value < cpu->iq[b].pc_value) ? a : b;
 }
 
@@ -883,7 +896,7 @@ free_VFU(APEX_CPU* cpu, int fu_type){
             if(cpu->branch_exec.has_insn == TRUE){
                 return FALSE;
             }
-        break;
+            break;
     }
     return TRUE;
 }
@@ -892,10 +905,11 @@ static void
 APEX_ISSUE_QUEUE(APEX_CPU *cpu){//Will handle grabbing the correct instructions in the IQ for Exec stage -J
     //I want to make it so there's a comparison between entry
 
+  print_iq(cpu);
+
     int entry_index = 100;
     for(int i = 0; i < 8; i++){
         if(cpu->iq[i].status_bit == 1 && free_VFU(cpu, cpu->iq[i].fu_type)){//Now check and see if the src_bits are valid (but diff instr wait on diff srcs) -J
-
 
             switch(cpu->iq[i].opcode){
                 //First look at instr w/ src1 & src2
@@ -968,9 +982,12 @@ APEX_ISSUE_QUEUE(APEX_CPU *cpu){//Will handle grabbing the correct instructions 
         }
     }
 
+    printf("AAAAAAAA %d\n", entry_index);
+
     //We have a valid instruction to issue
     //&& cpu->iq[entry_index].iq_time_padding == 1
     if(entry_index != 100){
+
 
         // Remove entry to exetue from IQ and LSQ (if MEM operation)
         cpu->iq[entry_index].status_bit = 0;
@@ -997,6 +1014,7 @@ APEX_ISSUE_QUEUE(APEX_CPU *cpu){//Will handle grabbing the correct instructions 
                 cpu->int_exec.pc = issuing_instr.pc_value;
                 cpu->int_exec.opcode = issuing_instr.opcode;
                 cpu->int_exec.has_insn = TRUE;
+                cpu->int_exec.stall = FALSE;
                 cpu->int_exec.vfu = INT_VFU;
                 switch(issuing_instr.opcode){//Break down INT ops based on instruction syntax -J
                     //dest src1 src2 -J
@@ -1036,6 +1054,14 @@ APEX_ISSUE_QUEUE(APEX_CPU *cpu){//Will handle grabbing the correct instructions 
                     case OPCODE_MOVC:
                         cpu->int_exec.rd = issuing_instr.dest;
                         cpu->int_exec.imm = issuing_instr.literal;
+                        break;
+
+                    //src1 src2 -H
+                    case OPCODE_CMP:
+                        cpu->int_exec.rs1 = issuing_instr.src1_tag;
+                        cpu->int_exec.rs2 = issuing_instr.src2_tag;
+                        cpu->int_exec.rs1_value = issuing_instr.src1_val;
+                        cpu->int_exec.rs2_value = issuing_instr.src2_val;
                         break;
 
                     //Nothing -J
@@ -1153,7 +1179,7 @@ APEX_execute(APEX_CPU *cpu)
         Check if there is a valid instruction to process, since memory instructions take 2 cycles in the memory stage we need to check for stalls -H
     */
 
-    if(cpu->int_exec.has_insn == TRUE && cpu->int_exec.stall != TRUE){
+    if(cpu->int_exec.has_insn == TRUE && cpu->int_exec.stall == FALSE){
         int mem_instruction = FALSE;
 
         printf("Int Exec: %d\n", cpu->int_exec.opcode);
@@ -1339,6 +1365,7 @@ APEX_execute(APEX_CPU *cpu)
                 } else{
                     cpu->positive_flag = FALSE;
                 }
+                break;
             }
 
             // LOAD <dest> <src2> <literal> -H
@@ -1368,13 +1395,14 @@ APEX_execute(APEX_CPU *cpu)
             } else {
                 // If there is no instruction currently in the mem stage advance current instruction to next stage -H
                 cpu->memory = cpu->int_exec; //Memory has its own stage
-                cpu->memory.stage_delay = 1;
                 cpu->int_exec.has_insn = FALSE;
-                cpu->int_exec.stall = TRUE;
+                cpu->int_exec.stall = FALSE;
             }
         } else{
             cpu->int_wb = cpu->int_exec;
             cpu->int_exec.has_insn = FALSE;
+            cpu->int_exec.stall = FALSE;
+
         }
 
     } else printf("Int Exec:\n");
@@ -1697,13 +1725,12 @@ APEX_memory(APEX_CPU *cpu)
                 }
             }
 
+            // The mem instruction is complete, check if another mem operation is being stalled in exe stage -H
             cpu->int_exec.stall = FALSE;
 
         }else{
 
             cpu->memory.stage_delay++;
-            // The mem instruction is complete, check if another mem operation is being stalled in exe stage -H
-                cpu->int_exec.stall = TRUE;
 
         }
 
@@ -1765,6 +1792,7 @@ APEX_forward(APEX_CPU* cpu, CPU_Stage forward){//This is where we'll forward the
         case OPCODE_BNP:
         case OPCODE_RET:
         case OPCODE_JUMP:
+        case OPCODE_CMP:
             for(auto it = cpu->rob->begin(); it != cpu->rob->end(); it++){
                 if(forward.pc == it->pc_value){
                     it->status_bit = 1;
@@ -1805,6 +1833,7 @@ APEX_writeback(APEX_CPU *cpu)
             break;
         }
         cpu->mem_wb.has_insn = FALSE;
+        printf("MEM WB: %d\n", cpu->mem_wb.opcode);
     }
     if(cpu->branch_wb.has_insn == TRUE){
         APEX_forward(cpu, cpu->branch_wb);
@@ -2020,10 +2049,10 @@ APEX_cpu_run(APEX_CPU *cpu)
         APEX_decode2(cpu);
         APEX_decode1(cpu);
         APEX_fetch(cpu);
-      /*  print_reg_file(cpu);
-        print_phys_reg_file(cpu);
-        print_rename_table(cpu);*/
-      //  print_memory(cpu);
+       print_reg_file(cpu);
+        //print_phys_reg_file(cpu);
+        //print_rename_table(cpu);
+      print_memory(cpu);
         printf("\n\n\n\n");
 
         if (cpu->single_step)
